@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#14082b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>¡Átomo Loco!</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="game">
+
+  <header id="hud">
+    <div id="hud-left">
+      <div id="protium-badge" hidden>⬡ <span id="protium-n">0</span></div>
+    </div>
+    <div id="hud-center">
+      <div id="logo">¡ÁTOMO LOCO!</div>
+      <div id="energy">0</div>
+      <div id="eps">0 /s</div>
+    </div>
+    <div id="hud-right">
+      <button id="mute" aria-label="sonido">♪</button>
+    </div>
+  </header>
+
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div id="floaters"></div>
+    <div id="combo-wrap"><div id="combo-bar"></div></div>
+    <div id="fever-label" hidden>¡FUSIÓN x5!</div>
+    <div id="buff-label" hidden></div>
+    <div id="quark" hidden></div>
+    <button id="prestige-btn" hidden>⬡ ¡CREAR PROTIUM!</button>
+  </div>
+
+  <div id="screen-elements" hidden>
+    <div id="elements-head">
+      <div id="el-wallet">⬡ 0</div>
+      <div id="el-progress">0/10 ELEMENTOS</div>
+      <div id="el-mult">×1.00 A TODO</div>
+    </div>
+    <div id="elements-grid"></div>
+    <div id="elements-hint">Gana ⬡ PROTIUM haciendo prestigio en el motor</div>
+  </div>
+
+  <footer id="shop"></footer>
+
+  <nav id="nav">
+    <button class="nav-tab active" id="tab-motor">⚛ MOTOR</button>
+    <button class="nav-tab" id="tab-elements">🧪 ELEMENTOS<span class="nav-dot" hidden></span></button>
+  </nav>
+
+  <div id="toast" hidden></div>
+
+  <div id="modal-back" hidden>
+    <div id="modal">
+      <div id="modal-title"></div>
+      <div id="modal-body"></div>
+      <div id="modal-buttons"></div>
+    </div>
+  </div>
+
+</div>
+<script src="game.js"></script>
+</body>
+</html>
