@@ -27,56 +27,91 @@ const COST_GROWTH = 1.15;
 const PRESTIGE_UNIT = 1e6;      // energía total por átomo de H (raíz)
 const PARTICLES_PER_H = 25;     // partículas entregadas por H extra en el colapso
 
-/* ---------- tabla de elementos (meta de largo plazo) ---------- */
-/* NUCLEOSÍNTESIS REAL: los átomos se ganan (H por colapso, el resto por
-   fusión en la estrella o rayos cósmicos). Descubrir un elemento da +25%
-   a todo, permanente. La escalera alfa sube hasta el Fe. */
-const ELEMENT_BONUS = 1.25;
-const ELEMENTS = [
-  { z:1,  sym:'H',  name:'HIDRÓGENO', color:'#29f3ff', via:'☀ COLAPSO de la nebulosa' },
-  { z:2,  sym:'He', name:'HELIO',     color:'#ffd93b', via:'fusión 4 H (10 M°)' },
-  { z:3,  sym:'Li', name:'LITIO',     color:'#ff2e88', via:'🌠 rayo cósmico (espalación)' },
-  { z:4,  sym:'Be', name:'BERILIO',   color:'#7dff6a', via:'🌠 rayo cósmico (espalación)' },
-  { z:5,  sym:'B',  name:'BORO',      color:'#ff7a2e', via:'🌠 rayo cósmico (espalación)' },
-  { z:6,  sym:'C',  name:'CARBONO',   color:'#c9c9dd', via:'triple-alfa: 3 He (100 M°)' },
-  { z:7,  sym:'N',  name:'NITRÓGENO', color:'#b14aed', via:'ciclo CNO: C+H (120 M°)' },
-  { z:8,  sym:'O',  name:'OXÍGENO',   color:'#ff4f4f', via:'C+He (200 M°)' },
-  { z:10, sym:'Ne', name:'NEÓN',      color:'#ff6fd8', via:'O+He (350 M°)' },
-  { z:12, sym:'Mg', name:'MAGNESIO',  color:'#9dffb0', via:'Ne+He (600 M°)' },
-  { z:14, sym:'Si', name:'SILICIO',   color:'#ffb86b', via:'Mg+He (1K M°)' },
-  { z:16, sym:'S',  name:'AZUFRE',    color:'#fff06b', via:'Si+He (1.6K M°)' },
-  { z:18, sym:'Ar', name:'ARGÓN',     color:'#8be9fd', via:'S+He (2.6K M°)' },
-  { z:20, sym:'Ca', name:'CALCIO',    color:'#f2f2f2', via:'Ar+He (4.1K M°)' },
-  { z:22, sym:'Ti', name:'TITANIO',   color:'#b0c4de', via:'Ca+He (6.6K M°)' },
-  { z:24, sym:'Cr', name:'CROMO',     color:'#9fe2bf', via:'Ti+He (10.5K M°)' },
-  { z:26, sym:'Fe', name:'HIERRO',    color:'#d08770', via:'Cr+He (17K M°)' },
-  /* r-process: solo nacen en supernovas (1 aleatorio por explosión) */
-  { z:29, sym:'Cu', name:'COBRE',   color:'#e8935a', via:'💥 solo SUPERNOVA', heavy:true },
-  { z:47, sym:'Ag', name:'PLATA',   color:'#dcdcdc', via:'💥 solo SUPERNOVA', heavy:true },
-  { z:79, sym:'Au', name:'ORO',     color:'#ffd700', via:'💥 solo SUPERNOVA', heavy:true },
-  { z:78, sym:'Pt', name:'PLATINO', color:'#c8d8e0', via:'💥 solo SUPERNOVA', heavy:true },
-  { z:82, sym:'Pb', name:'PLOMO',   color:'#7a8a9a', via:'💥 solo SUPERNOVA', heavy:true },
-  { z:92, sym:'U',  name:'URANIO',  color:'#7dff6a', via:'💥 solo SUPERNOVA', heavy:true },
+/* ---------- LA TABLA PERIÓDICA COMPLETA (118) ---------- */
+/* NUCLEOSÍNTESIS REAL — cada elemento se obtiene como en el universo:
+   H por colapso · escalera alfa por fusión · impares como subproducto
+   de la quema · Li/Be/B por rayos cósmicos · Z27-92 en supernovas ·
+   Z93+ solo en el laboratorio humano. Color = categoría química. */
+const CAT_COLORS = {
+  alc:'#ff6b6b',   // alcalinos
+  alct:'#ffa94d',  // alcalinotérreos
+  tran:'#74c0fc',  // metales de transición
+  post:'#b0c4de',  // post-transición
+  met:'#63e6be',   // metaloides
+  nome:'#ffd93b',  // no metales
+  hal:'#c8ff4a',   // halógenos
+  gas:'#ff6fd8',   // gases nobles
+  lan:'#b197fc',   // lantánidos
+  act:'#7dff6a',   // actínidos
+  des:'#c9c9dd',   // superpesados
+};
+const TABLE = [
+  [1,'H','HIDRÓGENO','nome'],[2,'He','HELIO','gas'],[3,'Li','LITIO','alc'],[4,'Be','BERILIO','alct'],
+  [5,'B','BORO','met'],[6,'C','CARBONO','nome'],[7,'N','NITRÓGENO','nome'],[8,'O','OXÍGENO','nome'],
+  [9,'F','FLÚOR','hal'],[10,'Ne','NEÓN','gas'],[11,'Na','SODIO','alc'],[12,'Mg','MAGNESIO','alct'],
+  [13,'Al','ALUMINIO','post'],[14,'Si','SILICIO','met'],[15,'P','FÓSFORO','nome'],[16,'S','AZUFRE','nome'],
+  [17,'Cl','CLORO','hal'],[18,'Ar','ARGÓN','gas'],[19,'K','POTASIO','alc'],[20,'Ca','CALCIO','alct'],
+  [21,'Sc','ESCANDIO','tran'],[22,'Ti','TITANIO','tran'],[23,'V','VANADIO','tran'],[24,'Cr','CROMO','tran'],
+  [25,'Mn','MANGANESO','tran'],[26,'Fe','HIERRO','tran'],[27,'Co','COBALTO','tran'],[28,'Ni','NÍQUEL','tran'],
+  [29,'Cu','COBRE','tran'],[30,'Zn','ZINC','tran'],[31,'Ga','GALIO','post'],[32,'Ge','GERMANIO','met'],
+  [33,'As','ARSÉNICO','met'],[34,'Se','SELENIO','nome'],[35,'Br','BROMO','hal'],[36,'Kr','KRIPTÓN','gas'],
+  [37,'Rb','RUBIDIO','alc'],[38,'Sr','ESTRONCIO','alct'],[39,'Y','ITRIO','tran'],[40,'Zr','CIRCONIO','tran'],
+  [41,'Nb','NIOBIO','tran'],[42,'Mo','MOLIBDENO','tran'],[43,'Tc','TECNECIO','tran'],[44,'Ru','RUTENIO','tran'],
+  [45,'Rh','RODIO','tran'],[46,'Pd','PALADIO','tran'],[47,'Ag','PLATA','tran'],[48,'Cd','CADMIO','tran'],
+  [49,'In','INDIO','post'],[50,'Sn','ESTAÑO','post'],[51,'Sb','ANTIMONIO','met'],[52,'Te','TELURIO','met'],
+  [53,'I','YODO','hal'],[54,'Xe','XENÓN','gas'],[55,'Cs','CESIO','alc'],[56,'Ba','BARIO','alct'],
+  [57,'La','LANTANO','lan'],[58,'Ce','CERIO','lan'],[59,'Pr','PRASEODIMIO','lan'],[60,'Nd','NEODIMIO','lan'],
+  [61,'Pm','PROMETIO','lan'],[62,'Sm','SAMARIO','lan'],[63,'Eu','EUROPIO','lan'],[64,'Gd','GADOLINIO','lan'],
+  [65,'Tb','TERBIO','lan'],[66,'Dy','DISPROSIO','lan'],[67,'Ho','HOLMIO','lan'],[68,'Er','ERBIO','lan'],
+  [69,'Tm','TULIO','lan'],[70,'Yb','ITERBIO','lan'],[71,'Lu','LUTECIO','lan'],[72,'Hf','HAFNIO','tran'],
+  [73,'Ta','TANTALIO','tran'],[74,'W','WOLFRAMIO','tran'],[75,'Re','RENIO','tran'],[76,'Os','OSMIO','tran'],
+  [77,'Ir','IRIDIO','tran'],[78,'Pt','PLATINO','tran'],[79,'Au','ORO','tran'],[80,'Hg','MERCURIO','tran'],
+  [81,'Tl','TALIO','post'],[82,'Pb','PLOMO','post'],[83,'Bi','BISMUTO','post'],[84,'Po','POLONIO','post'],
+  [85,'At','ASTATO','hal'],[86,'Rn','RADÓN','gas'],[87,'Fr','FRANCIO','alc'],[88,'Ra','RADIO','alct'],
+  [89,'Ac','ACTINIO','act'],[90,'Th','TORIO','act'],[91,'Pa','PROTACTINIO','act'],[92,'U','URANIO','act'],
+  [93,'Np','NEPTUNIO','act'],[94,'Pu','PLUTONIO','act'],[95,'Am','AMERICIO','act'],[96,'Cm','CURIO','act'],
+  [97,'Bk','BERKELIO','act'],[98,'Cf','CALIFORNIO','act'],[99,'Es','EINSTENIO','act'],[100,'Fm','FERMIO','act'],
+  [101,'Md','MENDELEVIO','act'],[102,'No','NOBELIO','act'],[103,'Lr','LAURENCIO','act'],[104,'Rf','RUTHERFORDIO','tran'],
+  [105,'Db','DUBNIO','tran'],[106,'Sg','SEABORGIO','tran'],[107,'Bh','BOHRIO','tran'],[108,'Hs','HASIO','tran'],
+  [109,'Mt','MEITNERIO','des'],[110,'Ds','DARMSTATIO','des'],[111,'Rg','ROENTGENIO','des'],[112,'Cn','COPERNICIO','des'],
+  [113,'Nh','NIHONIO','des'],[114,'Fl','FLEROVIO','des'],[115,'Mc','MOSCOVIO','des'],[116,'Lv','LIVERMORIO','des'],
+  [117,'Ts','TENESO','des'],[118,'Og','OGANESÓN','des'],
 ];
+/* rutas de obtención */
+const ALPHA_OUTS = { He:1, C:1, N:1, O:1, Ne:1, Mg:1, Si:1, S:1, Ar:1, Ca:1, Ti:1, Cr:1, Fe:1 };
+const BYPRODUCT_OF = { F:'O', Na:'Ne', Al:'Mg', P:'Si', Cl:'S', K:'Ar', Sc:'Ca', V:'Ti', Mn:'Cr' };
+function originOf(sym, z){
+  if(sym==='H')                      return { via:'☀ COLAPSO de la nebulosa', origin:'colapso' };
+  if(sym==='Li'||sym==='Be'||sym==='B') return { via:'🌠 rayo cósmico (espalación)', origin:'cosmic' };
+  if(ALPHA_OUTS[sym])                return { via:'⚛ fusión en la ⭐ ESTRELLA', origin:'fusion' };
+  if(BYPRODUCT_OF[sym])              return { via:'chispa al fusionar '+BYPRODUCT_OF[sym]+' (⭐)', origin:'by' };
+  if(z<=92)                          return { via:'💥 botín de SUPERNOVA', origin:'nova' };
+  return                                    { via:'🔬 LABORATORIO (sintético)', origin:'lab' };
+}
+const ELEMENTS = TABLE.map(([z,sym,name,cat])=>
+  Object.assign({ z, sym, name, color:CAT_COLORS[cat] }, originOf(sym,z)));
 const ELEM = {}; ELEMENTS.forEach(e=>ELEM[e.sym]=e);
-const LIGHT_ELEMENTS = ELEMENTS.filter(e=>!e.heavy);
-const HEAVY_ELEMENTS = ELEMENTS.filter(e=>e.heavy);
+const NOVA_POOL   = ELEMENTS.filter(e=>e.origin==='nova');   // Z27-92 (menos escalera)
+const LAB_ELEMENTS = ELEMENTS.filter(e=>e.origin==='lab');   // Z93-118, en orden
+const FE_ERA = ELEMENTS.filter(e=>e.z<=26);                  // "hasta el hierro"
 
 /* recetas de fusión: consumen átomos, exigen temperatura, DEVUELVEN energía
    (la fusión es exotérmica… hasta el hierro, que no paga) */
+/* `by`: la quema salpica al vecino impar (25% por fusión) — así el juego
+   cubre F, Na, Al, P, Cl, K, Sc, V y Mn sin recetas extra */
 const RECIPES = [
   { out:'He', in:{H:4},       temp:10,    refund:5e4,     note:'cadena protón-protón' },
   { out:'C',  in:{He:3},      temp:100,   refund:4e5,     note:'triple-alfa ¡se salta Li·Be·B!' },
   { out:'N',  in:{C:1,H:1},   temp:120,   refund:6e5,     note:'ciclo CNO' },
-  { out:'O',  in:{C:1,He:1},  temp:200,   refund:1.6e6,   note:'escalera alfa' },
-  { out:'Ne', in:{O:1,He:1},  temp:350,   refund:6e6,     note:'escalera alfa' },
-  { out:'Mg', in:{Ne:1,He:1}, temp:600,   refund:2.5e7,   note:'escalera alfa' },
-  { out:'Si', in:{Mg:1,He:1}, temp:1000,  refund:1e8,     note:'escalera alfa' },
-  { out:'S',  in:{Si:1,He:1}, temp:1600,  refund:4e8,     note:'escalera alfa' },
-  { out:'Ar', in:{S:1,He:1},  temp:2600,  refund:1.6e9,   note:'escalera alfa' },
-  { out:'Ca', in:{Ar:1,He:1}, temp:4100,  refund:6.4e9,   note:'escalera alfa' },
-  { out:'Ti', in:{Ca:1,He:1}, temp:6600,  refund:2.56e10, note:'escalera alfa' },
-  { out:'Cr', in:{Ti:1,He:1}, temp:10500, refund:1e11,    note:'escalera alfa' },
+  { out:'O',  in:{C:1,He:1},  temp:200,   refund:1.6e6,   note:'escalera alfa', by:'F' },
+  { out:'Ne', in:{O:1,He:1},  temp:350,   refund:6e6,     note:'escalera alfa', by:'Na' },
+  { out:'Mg', in:{Ne:1,He:1}, temp:600,   refund:2.5e7,   note:'escalera alfa', by:'Al' },
+  { out:'Si', in:{Mg:1,He:1}, temp:1000,  refund:1e8,     note:'escalera alfa', by:'P' },
+  { out:'S',  in:{Si:1,He:1}, temp:1600,  refund:4e8,     note:'escalera alfa', by:'Cl' },
+  { out:'Ar', in:{S:1,He:1},  temp:2600,  refund:1.6e9,   note:'escalera alfa', by:'K' },
+  { out:'Ca', in:{Ar:1,He:1}, temp:4100,  refund:6.4e9,   note:'escalera alfa', by:'Sc' },
+  { out:'Ti', in:{Ca:1,He:1}, temp:6600,  refund:2.56e10, note:'escalera alfa', by:'V' },
+  { out:'Cr', in:{Ti:1,He:1}, temp:10500, refund:1e11,    note:'escalera alfa', by:'Mn' },
   { out:'Fe', in:{Cr:1,He:1}, temp:17000, refund:0,       note:'el hierro NO paga · así mueren las estrellas' },
 ];
 
@@ -112,10 +147,14 @@ const ACHIEVEMENTS = [
   { id:'elem10',   name:'Señor del Neón',      test:s=>forgedCount(s)>=10, msg:'10 elementos descubiertos' },
   { id:'fe1',      name:'Corazón de hierro',   test:s=>!!(s.elements&&s.elements.Fe), msg:'Fusionaste HIERRO' },
   { id:'elem17',   name:'Alquimista estelar',
-    test:s=>LIGHT_ELEMENTS.every(e=>s.elements&&s.elements[e.sym]), msg:'¡Los 17 elementos ligeros!' },
+    test:s=>FE_ERA.every(e=>s.elements&&s.elements[e.sym]), msg:'Todos los elementos hasta el HIERRO' },
   { id:'nova1',    name:'Semilla de mundos',   test:s=>!!s.seen.nova, msg:'Tu primera SUPERNOVA' },
-  { id:'heavy6',   name:'r-process completo',
-    test:s=>HEAVY_ELEMENTS.every(e=>s.elements&&s.elements[e.sym]), msg:'Los 6 pesados: ×2 extra a todo' },
+  { id:'elem50',   name:'Coleccionista cósmico', test:s=>forgedCount(s)>=50,  msg:'50 elementos descubiertos' },
+  { id:'nat92',    name:'Todo lo natural',
+    test:s=>ELEMENTS.filter(e=>e.z<=92).every(e=>s.elements&&s.elements[e.sym]), msg:'Los 92 naturales — se abre el LABORATORIO' },
+  { id:'lab1',     name:'Prometeo moderno',    test:s=>!!s.seen.lab, msg:'Primer elemento sintético' },
+  { id:'all118',   name:'LA TABLA COMPLETA',
+    test:s=>ELEMENTS.every(e=>s.elements&&s.elements[e.sym]), msg:'¡Los 118! ×2 extra a todo, para siempre' },
 ];
 function forgedCount(s){ return Object.keys((s||S).elements||{}).length; }
 
@@ -162,11 +201,16 @@ function costOf(b){ return Math.ceil(b.baseCost * Math.pow(COST_GROWTH, cnt(b.id
 /* el mult de colapso usa el H GANADO EN LA VIDA:
    gastarlo en elementos nunca te debilita */
 function prestigeMult(){ return 1 + S.hEver*0.10; }
-function elementsMult(){ return Math.pow(ELEMENT_BONUS, forgedCount()); }
-/* ✦ polvo estelar: +75% por supernova; los 6 pesados completos: ×2 extra */
+/* bono por colección: los primeros 17 (hasta el Fe) valen +25% c/u,
+   del 18 en adelante +10% c/u — 118 descubiertos ≈ ×44 × ×15K */
+function elementsMult(){
+  const n = forgedCount();
+  return Math.pow(1.25, Math.min(n,17)) * Math.pow(1.10, Math.max(0, n-17));
+}
+/* ✦ polvo estelar: +75% por supernova; la tabla COMPLETA (118): ×2 extra */
 function dustMult(){
-  const all6 = HEAVY_ELEMENTS.every(e=>S.elements[e.sym]);
-  return (1 + 0.75*S.dust) * (all6 ? 2 : 1);
+  const all = ELEMENTS.every(e=>S.elements[e.sym]);
+  return (1 + 0.75*S.dust) * (all ? 2 : 1);
 }
 function globalMult(){
   let m = 1;
@@ -204,7 +248,7 @@ function pendingH(){
 /* ---------- utilidades ---------- */
 const now = () => performance.now();
 const $ = id => document.getElementById(id);
-const SUFF = ['','K','M','B','T','Qa','Qi','Sx','Sp'];
+const SUFF = ['','K','M','B','T','Qa','Qi','Sx','Sp','Oc','No','Dc'];
 function fmt(n){
   if(n < 1000) return Math.floor(n).toString();
   let i = 0;
@@ -751,7 +795,8 @@ function discover(sym){
   if(S.elements[sym]) return;
   S.elements[sym] = 1;
   const el = ELEM[sym];
-  toast('🧪 ¡NUEVO ELEMENTO: '+el.name+'! +25% a todo, permanente');
+  const bono = forgedCount() <= 17 ? '+25%' : '+10%';
+  toast('🧪 ¡NUEVO ELEMENTO: '+el.name+'! '+bono+' a todo, permanente');
   sndAch(); vibrate([20,30,20]);
   const d = elNodes[ELEMENTS.indexOf(el)];
   if(d){ d.classList.remove('just-forged'); void d.offsetWidth; d.classList.add('just-forged'); }
@@ -822,6 +867,15 @@ function runRecipe(r, times){
   }
   S.seen.fusedOnce = 1;
   discover(r.out);
+  /* chispa de subproducto: la quema salpica al vecino impar */
+  if(r.by){
+    let k = 0;
+    for(let i=0;i<done;i++) if(Math.random() < 0.25) k++;
+    if(k > 0){
+      S.atoms[r.by] = atomsOf(r.by) + k;
+      discover(r.by);
+    }
+  }
   sndBuy(); vibrate(15);
   fuseFX(r, done, refund);
   refreshStarScreen(); refreshHud(); save();
@@ -1171,9 +1225,18 @@ function refreshTabla(){
       cost.textContent = '×'+fmt(atomsOf(el.sym));
     }else{
       d.classList.add('locked');
-      cost.textContent = el.heavy ? '💥' : '?';
+      /* pista visual de dónde se consigue */
+      cost.textContent = { cosmic:'🌠', nova:'💥', lab:'🔬' }[el.origin] || '?';
     }
   });
+  /* laboratorio: aparece con los 92 naturales completos */
+  const lb = $('lab-btn');
+  const nx = labUnlocked() ? nextLab() : null;
+  lb.hidden = !nx;
+  if(nx){
+    lb.textContent = '🔬 SINTETIZAR '+nx.sym+' · ⚡'+fmt(labCost());
+    lb.classList.toggle('cant', S.e < labCost());
+  }
   /* hint educativo (la tabla sí lleva texto) */
   const hint = $('elements-hint');
   const pend = pendingH();
@@ -1204,19 +1267,25 @@ $('nova-btn').addEventListener('click', ()=>{
   if(!S.elements.Fe) return;
   const atomsTotal = Object.values(S.atoms).reduce((a,b)=>a+(b||0),0);
   const gain = 1 + Math.floor(atomsTotal/200);
+  const drops = novaDropCount(gain);
   showModal('💥 SUPERNOVA',
     `Tu estrella tiene un <b>corazón de HIERRO</b>:<br>la fusión ya no devuelve energía.<br>`+
     `Solo queda el colapso final… y la EXPLOSIÓN.<br><br>`+
     `Pierdes: energía, partículas, átomos y calor<br>(el piso térmico conserva un 25%).<br>`+
     `Conservas: elementos descubiertos y tu H de por vida.<br><br>`+
     `Ganas <b>✦ ${gain} POLVO ESTELAR</b> (+${gain*75}% a todo)<br>`+
-    `y naces con <b>1 elemento pesado</b> (proceso-r)`,
+    `y forjas <b>${drops} elemento${drops>1?'s':''} pesado${drops>1?'s':''}</b> (proceso-r)`,
     [
       { label:'¡EXPLOTAR!', cb:()=>doSupernova(gain) },
       { label:'Aún no', alt:true, cb:()=>{} },
     ]);
 });
+function novaDropCount(gain){
+  const missing = NOVA_POOL.filter(e=>!S.elements[e.sym]).length;
+  return Math.min(missing, 2 + gain);   // más átomos al explotar = más botín
+}
 function doSupernova(gain){
+  const drops = novaDropCount(gain);
   /* reset de la generación */
   S.e = 0;
   BUILDINGS.forEach(b=>S.counts[b.id]=0);
@@ -1227,16 +1296,19 @@ function doSupernova(gain){
   blob = [];
   Object.values(shopNodes).forEach(n=>{ n.revealed=false; n.d.classList.add('locked'); n.nm.textContent='???'; n.info.textContent=''; });
   stage.classList.remove('fever');
-  /* botín */
+  /* botín: varios pesados del pool natural Z27-92 */
   S.dust += gain;
   S.seen.nova = 1;
-  const missing = HEAVY_ELEMENTS.filter(e=>!S.elements[e.sym]);
+  const missing = NOVA_POOL.filter(e=>!S.elements[e.sym]);
   if(missing.length){
-    const el = missing[Math.floor(Math.random()*missing.length)];
-    S.atoms[el.sym] = 1;
-    discover(el.sym);
+    for(let i=0;i<drops && missing.length;i++){
+      const idx = Math.floor(Math.random()*missing.length);
+      const el = missing.splice(idx,1)[0];
+      S.atoms[el.sym] = 1;
+      discover(el.sym);
+    }
   }else{
-    S.dust += 1;   // ya lo tienes todo: polvo extra
+    S.dust += 1;   // pool agotado: polvo extra
   }
   /* fx */
   const f = $('nova-flash');
@@ -1251,6 +1323,34 @@ function doSupernova(gain){
   toast('💥 ¡SUPERNOVA! ✦'+gain+' — todo el oro del universo nació en una explosión así');
   refreshStarScreen(); refreshShop(); refreshHud(); save();
 }
+
+/* ---------- LABORATORIO: sintéticos Z93-118 (post-naturales) ---------- */
+function labUnlocked(){ return ELEMENTS.filter(e=>e.z<=92).every(e=>S.elements[e.sym]); }
+function nextLab(){ return LAB_ELEMENTS.find(e=>!S.elements[e.sym]); }
+function labCost(){
+  const done = LAB_ELEMENTS.filter(e=>S.elements[e.sym]).length;
+  return 1e13 * Math.pow(5, done);
+}
+$('lab-btn').addEventListener('click', ()=>{
+  const el = nextLab();
+  if(!el || !labUnlocked()) return;
+  showModal('🔬 SINTETIZAR '+el.name,
+    `<b>${el.sym}</b> (Z=${el.z}) no existe en la naturaleza:<br>`+
+    `ninguna estrella lo fabrica — solo la humanidad.<br><br>`+
+    `Costo: <b>⚡${fmt(labCost())}</b>`,
+    [
+      { label:'¡SINTETIZAR!', cb:()=>{
+          if(S.e < labCost()){ toast('⚡ Te falta energía para el acelerador'); return; }
+          S.e -= labCost();
+          S.atoms[el.sym] = 1;
+          S.seen.lab = 1;
+          discover(el.sym);
+          sndGold(); shake(); vibrate([30,50,30]);
+          refreshTabla(); refreshHud(); save();
+        } },
+      { label:'Aún no', alt:true, cb:()=>{} },
+    ]);
+});
 const toastQ = [];
 let toastBusy = false;
 function toast(msg){

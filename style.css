@@ -533,10 +533,24 @@ html,body{
   100%{opacity:0}
 }
 
+#lab-btn{
+  font-family:var(--px-font);
+  font-size:8px;
+  padding:12px 10px;
+  color:#04121e;
+  background:linear-gradient(180deg,#8be9fd,#4aa8c9);
+  border:3px solid #fff;
+  border-radius:8px;
+  box-shadow:0 0 14px rgba(139,233,253,.5),0 4px 0 #1d4b61;
+  animation:prestige-glow 1.2s ease-in-out infinite alternate;
+}
+#lab-btn:active{transform:translateY(3px);box-shadow:none}
+#lab-btn.cant{filter:grayscale(.8) brightness(.6);animation:none}
+
 #elements-grid{
   display:grid;
-  grid-template-columns:repeat(4,1fr);
-  gap:10px;
+  grid-template-columns:repeat(6,1fr);
+  gap:6px;
 }
 .el-tile{
   position:relative;
@@ -554,9 +568,9 @@ html,body{
   transition:transform .07s;
 }
 .el-tile:active{transform:scale(.93)}
-.el-tile .el-num{position:absolute;top:4px;left:6px;font-size:7px;opacity:.6}
-.el-tile .el-sym{font-size:17px}
-.el-tile .el-cost{font-size:7px;color:var(--yellow)}
+.el-tile .el-num{position:absolute;top:3px;left:4px;font-size:5px;opacity:.6}
+.el-tile .el-sym{font-size:11px}
+.el-tile .el-cost{font-size:6px;color:var(--yellow)}
 .el-tile.locked{filter:grayscale(1) brightness(.45)}
 .el-tile.locked .el-sym{opacity:.35}
 .el-tile.can{

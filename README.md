@@ -40,7 +40,20 @@ lo abre fullscreen (meta apple-mobile-web-app).
 
 - **⚛ MOTOR** — la nebulosa: núcleo, taps, tienda de partículas, quark dorado, colapso. La acción.
 - **⭐ ESTRELLA** — la forja visual: una estrella pixel art viva (color por temperatura, capas de cebolla por receta dominada, corona pulsante). La fusión se entiende **sin texto**: el reactor muestra la receta como pictograma (4 bolitas H → bolita He), el gauge lleva un tick de color con la meta térmica de la receta elegida, y al fusionar los átomos VUELAN al núcleo, flash, y el producto sale disparado. Feedback de error también visual: frío = gauge parpadea azul; faltan átomos = las bolitas tiemblan en rojo.
-- **🧪 TABLA** — la colección: 23 tiles (17 ligeros + 6 pesados de supernova), conteos de átomos, progreso y multiplicador. Tap en un tile = ficha del elemento con su origen.
+- **🧪 TABLA** — la colección: **los 118 elementos**, coloreados por categoría química (alcalinos, transición, lantánidos…). Cada tile no descubierto muestra un icono de DÓNDE se consigue (🌠 rayo cósmico / 💥 supernova / 🔬 laboratorio / ? fusión). Tap en un tile = ficha del elemento con su origen.
+
+## Cómo se consiguen los 118 (nucleosíntesis real)
+
+| Bloque | Elementos | Cómo |
+|---|---|---|
+| Big Bang / colapso | H | ☀ COLAPSO de la nebulosa |
+| Rayos cósmicos | Li, Be, B | 🌠 espalación (quark dorado) |
+| Fusión estelar | escalera alfa He→Fe | recetas de la ⭐ ESTRELLA |
+| Subproductos de quema | F, Na, Al, P, Cl, K, Sc, V, Mn | 25% de chispa al fusionar su vecino |
+| Supernova | Z 27–92 (Co→U, 66 elementos) | 💥 cada explosión suelta `2+✦` aleatorios |
+| Laboratorio humano | Z 93–118 (Np→Og, 26 sintéticos) | 🔬 se abre con los 92 naturales; costo ⚡10T ×5 c/u |
+
+Bono por descubrimiento: +25% los primeros 17, +10% del 18 en adelante (multiplicativo). La tabla completa: **×2 extra permanente**.
 
 ## 💥 Supernova (prestigio mayor)
 
