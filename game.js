@@ -19,10 +19,12 @@ const BUILDINGS = [
     info:'+400 energía/s' },
 ];
 const COST_GROWTH = 1.15;
-const PRESTIGE_UNIT = 1e6;   // energía total por unidad de protium (raíz)
+const PRESTIGE_UNIT = 1e6;      // energía total por átomo de H (raíz)
+const PARTICLES_PER_H = 25;     // partículas entregadas por H extra en el colapso
 
 /* ---------- tabla de elementos (meta de largo plazo) ---------- */
-/* Se forjan EN ORDEN gastando ⬡ Protium. Cada uno: +25% a todo, permanente. */
+/* Se forjan EN ORDEN gastando átomos de HIDRÓGENO (H), ganados con el
+   COLAPSO gravitacional de la nebulosa. Cada uno: +25% a todo, permanente. */
 const ELEMENT_BONUS = 1.25;
 const ELEMENTS = [
   { z:1,  sym:'H',  name:'HIDRÓGENO', cost:1,  color:'#29f3ff' },
@@ -52,7 +54,7 @@ const ACHIEVEMENTS = [
   { id:'e1b',      name:'Supernova',           test:s=>s.total>=1e9,  msg:'1B de energía total' },
   { id:'quark1',   name:'Cazador de quarks',   test:s=>s.quarks>=1,   msg:'Atrapaste un quark dorado' },
   { id:'fever1',   name:'¡FUSIÓN NUCLEAR!',    test:s=>s.fevers>=1,   msg:'Primera fusión' },
-  { id:'prestige1',name:'Nucleosíntesis',      test:s=>s.protiumEver>=1, msg:'Primer átomo de Protium' },
+  { id:'prestige1',name:'Colapso gravitacional', test:s=>s.hEver>=1, msg:'Tu nebulosa colapsó en Hidrógeno' },
   { id:'elem1',    name:'¡Elemental!',         test:s=>forgedCount(s)>=1,  msg:'Forjaste tu primer elemento' },
   { id:'elem5',    name:'Media tabla',         test:s=>forgedCount(s)>=5,  msg:'5 elementos forjados' },
   { id:'elem10',   name:'Señor del Neón',      test:s=>forgedCount(s)>=10, msg:'¡Los 10 elementos!' },
@@ -60,13 +62,17 @@ const ACHIEVEMENTS = [
 function forgedCount(s){ return Object.keys((s||S).elements||{}).length; }
 
 /* ---------- estado ---------- */
-const SAVE_KEY = 'atomoLocoSave_v1';
+const SAVE_KEY = 'atomoLocoSave_v2';
 
 function defaultState(){
   const counts = {};
   BUILDINGS.forEach(b=>counts[b.id]=0);
   return {
-    e:0, total:0, taps:0, protium:0, protiumEver:0, quarks:0, fevers:0,
+    e:0, total:0, taps:0,
+    h:0,       // átomos de Hidrógeno en cartera (moneda de forja)
+    hEver:0,   // H ganado en la vida (base del mult de colapso)
+    hBase:0,   // parte "raíz de energía" ya reclamada (contabilidad del pendiente)
+    quarks:0, fevers:0,
     counts, elements:{}, ach:{}, seen:{}, muted:false, t:Date.now()
   };
 }
@@ -84,7 +90,6 @@ function load(){
     S = Object.assign(defaultState(), d);
     S.counts = Object.assign(defaultState().counts, d.counts||{});
     S.elements = d.elements || {};
-    if(d.protiumEver === undefined) S.protiumEver = S.protium;  // migración saves viejos
     return true;
   }catch(e){ return false; }
 }
@@ -92,9 +97,9 @@ function load(){
 /* ---------- derivados ---------- */
 const cnt = id => S.counts[id]||0;
 function costOf(b){ return Math.ceil(b.baseCost * Math.pow(COST_GROWTH, cnt(b.id))); }
-/* el mult de prestigio usa el protium GANADO EN LA VIDA:
+/* el mult de colapso usa el H GANADO EN LA VIDA:
    gastarlo en elementos nunca te debilita */
-function prestigeMult(){ return 1 + S.protiumEver*0.10; }
+function prestigeMult(){ return 1 + S.hEver*0.10; }
 function elementsMult(){ return Math.pow(ELEMENT_BONUS, forgedCount()); }
 function globalMult(){
   let m = 1;
@@ -114,8 +119,17 @@ function tapValue(){
   BUILDINGS.forEach(b=>{ t += b.tap*cnt(b.id); });
   return t * globalMult() * (feverOn()?5:1) * (frenzyOn()?7:1);
 }
-function pendingProtium(){
-  return Math.floor(Math.sqrt(S.total / PRESTIGE_UNIT)) - S.protiumEver;
+/* COLAPSO: la parte base sale de la energía total (raíz), y ENTREGAR tus
+   partículas (protones+neutrones) suma H extra — se convierten literalmente
+   en el hidrógeno que te llevas. Solo disponible cuando la base ≥ 1. */
+function colapsoBase(){
+  return Math.floor(Math.sqrt(S.total / PRESTIGE_UNIT)) - S.hBase;
+}
+function colapsoBonus(){
+  return Math.floor((cnt('proton') + cnt('neutron')) / PARTICLES_PER_H);
+}
+function pendingH(){
+  return colapsoBase() >= 1 ? colapsoBase() + colapsoBonus() : 0;
 }
 
 /* ---------- utilidades ---------- */
@@ -411,7 +425,7 @@ function refreshHud(){
   $('energy').textContent = '⚡'+fmt(S.e);
   $('eps').textContent = fmt(eps())+' /s' + (frenzyOn()?' 🔥x7':'');
   const pb = $('protium-badge');
-  if(S.protium>0 || S.protiumEver>0){ pb.hidden = false; $('protium-n').textContent = S.protium; }
+  if(S.h>0 || S.hEver>0){ pb.hidden = false; $('protium-n').textContent = S.h; }
 }
 
 /* ---------- tienda ---------- */
@@ -557,22 +571,28 @@ quarkEl.addEventListener('pointerdown', ev=>{
   hideQuark();
 }, {passive:false});
 
-/* ---------- prestigio ---------- */
+/* ---------- COLAPSO (prestigio) ---------- */
 $('prestige-btn').addEventListener('click', ()=>{
-  const p = pendingProtium();
+  const p = pendingH();
   if(p<1) return;
-  showModal('⬡ NUCLEOSÍNTESIS',
-    `Fusiona tu progreso en <b>${p} átomo${p>1?'s':''} de PROTIUM</b>.<br><br>`+
-    `Pierdes energía y partículas…<br>pero ganas <b>+${p*10}% a TODO, para siempre</b>`+
-    `<br><br>y con ⬡ forjas <b>ELEMENTOS</b> 🧪`,
+  const bonus = colapsoBonus();
+  const particles = cnt('proton') + cnt('neutron');
+  showModal('☀ COLAPSO GRAVITACIONAL',
+    `La nebulosa colapsa bajo su propia gravedad…<br><br>`+
+    `Tus <b>${particles} protones y neutrones</b> se convierten en`+
+    `<br><b style="font-size:14px">${p} átomo${p>1?'s':''} de HIDRÓGENO</b>`+
+    (bonus>0 ? `<br>(${p-bonus} por energía + ${bonus} por tus partículas)` : '')+
+    `<br><br>Ganas <b>+${p*10}% a TODO, para siempre</b>`+
+    `<br>y con H forjas <b>ELEMENTOS</b> en la ⭐ ESTRELLA`,
     [
-      { label:'¡FUSIONAR!', cb:()=>{ doPrestige(p); } },
+      { label:'¡COLAPSAR!', cb:()=>{ doColapso(p); } },
       { label:'Aún no', alt:true, cb:()=>{} },
     ]);
 });
-function doPrestige(p){
-  S.protium += p;
-  S.protiumEver += p;
+function doColapso(p){
+  S.hBase += colapsoBase();   // antes de vaciar contadores
+  S.h += p;
+  S.hEver += p;
   S.e = 0;
   BUILDINGS.forEach(b=>S.counts[b.id]=0);
   heat = 0; buffs.feverUntil = 0; buffs.frenzyUntil = 0;
@@ -582,21 +602,21 @@ function doPrestige(p){
   shake(); sndGold(); vibrate([40,60,40]);
   const c = nucleusCenter();
   burst(c.x, c.y, '#ffd93b', 60, 2.5);
-  toast('⬡ ¡'+p+' PROTIUM! +'+(p*10)+'% permanente');
+  toast('☀ ¡'+p+' HIDRÓGENO! +'+(p*10)+'% permanente');
   if(!S.seen.forgeHint){
     S.seen.forgeHint = 1;
-    setTimeout(()=>toast('🧪 Con ⬡ forjas ELEMENTOS — mira el tab de abajo'), 2500);
+    setTimeout(()=>toast('⭐ Con tu H forja ELEMENTOS — tab ESTRELLA abajo'), 2500);
   }
   refreshShop(); refreshHud(); save();
 }
 function refreshPrestige(){
-  const p = pendingProtium();
+  const p = pendingH();
   const btn = $('prestige-btn');
   if(p>=1){
-    btn.hidden = false; btn.textContent = '⬡ +'+p+' PROTIUM';
+    btn.hidden = false; btn.textContent = '☀ COLAPSO +'+p+' H';
     if(!S.seen.prestigeReady){
       S.seen.prestigeReady = 1;
-      toast('⬡ ¡NUCLEOSÍNTESIS LISTA! Toca el botón dorado ↑');
+      toast('☀ ¡La nebulosa puede COLAPSAR! Toca el botón dorado ↑');
       sndAch();
     }
   }
@@ -617,7 +637,7 @@ function setScreen(m){
 }
 $('tab-motor').addEventListener('click', ()=>setScreen('motor'));
 $('tab-elements').addEventListener('click', ()=>setScreen('elements'));
-/* atajo: tocar el badge ⬡ del HUD lleva a la colección */
+/* atajo: tocar el badge H del HUD lleva a la estrella */
 $('protium-badge').addEventListener('click', ()=>setScreen('elements'));
 
 /* ---------- forja de elementos ---------- */
@@ -650,19 +670,19 @@ function refreshElements(){
       d.classList.add('forged');
       cost.textContent = '✓';
     }else if(i === next){
-      cost.textContent = '⬡'+el.cost;
-      if(S.protium >= el.cost) d.classList.add('can');
+      cost.textContent = el.cost+'H';
+      if(S.h >= el.cost) d.classList.add('can');
     }else{
       d.classList.add('locked');
-      cost.textContent = '⬡'+el.cost;
+      cost.textContent = el.cost+'H';
     }
   });
-  $('el-wallet').textContent = '⬡ '+S.protium;
+  $('el-wallet').textContent = 'H × '+S.h;
   $('el-progress').textContent = forgedCount()+'/'+ELEMENTS.length+' ELEMENTOS';
   $('el-mult').textContent = '×'+elementsMult().toFixed(2)+' A TODO';
   /* punto de aviso en el tab cuando hay forja disponible */
   const n = ELEMENTS[next];
-  const canForge = !!(n && S.protium >= n.cost);
+  const canForge = !!(n && S.h >= n.cost);
   $('tab-elements').querySelector('.nav-dot').hidden = !canForge;
   /* anuncia UNA vez cada elemento que se vuelve alcanzable */
   if(canForge && !S.seen['can_'+n.sym]){
@@ -670,20 +690,20 @@ function refreshElements(){
     toast('🧪 ¡Ya puedes forjar '+n.name+'!');
     sndAch();
   }
-  /* hint dinámico: siempre dice cuál es el siguiente paso hacia el próximo ⬡ */
+  /* hint dinámico: siempre dice cuál es el siguiente paso hacia el próximo H */
   const hint = $('elements-hint');
-  const pend = pendingProtium();
+  const pend = pendingH();
   if(!n){
     hint.textContent = '🏆 ¡Tabla completa! (por ahora…)';
   }else if(canForge){
     hint.textContent = '¡Toca '+n.sym+' para forjarlo!';
   }else if(pend >= 1){
-    hint.textContent = '⬡'+pend+' por reclamar → botón dorado de PRESTIGIO en el motor';
+    hint.textContent = pend+' H por reclamar → botón ☀ COLAPSO en el motor';
   }else{
-    /* progreso hacia el siguiente protium: total = (ever+1)² × 1M */
-    const target = Math.pow(S.protiumEver+1, 2) * PRESTIGE_UNIT;
+    /* progreso hacia el siguiente H base: total = (hBase+1)² × 1M */
+    const target = Math.pow(S.hBase+1, 2) * PRESTIGE_UNIT;
     const pct = Math.min(99, Math.floor(S.total/target*100));
-    hint.textContent = 'Próximo ⬡ a '+fmt(target)+' de energía total — vas al '+pct+'%';
+    hint.textContent = 'Próximo H a '+fmt(target)+' de energía total — vas al '+pct+'% (tus protones y neutrones darán H extra)';
   }
 }
 function elementTapped(i){
@@ -697,12 +717,12 @@ function elementTapped(i){
     toast('🔒 Primero forja '+ELEMENTS[next].sym+' ('+ELEMENTS[next].name+')');
     return;
   }
-  if(S.protium < el.cost){
-    toast('Necesitas ⬡'+el.cost+' — haz prestigio en el motor');
+  if(S.h < el.cost){
+    toast('Necesitas '+el.cost+' H — colapsa la nebulosa en el motor');
     return;
   }
   showModal('🧪 FORJAR '+el.name,
-    `<b>${el.sym}</b> (Z=${el.z})<br><br>Costo: <b>⬡${el.cost} Protium</b><br>`+
+    `<b>${el.sym}</b> (Z=${el.z})<br><br>Costo: <b>${el.cost} átomo${el.cost>1?'s':''} de H</b><br>`+
     `Bono: <b>+25% a TODO, para siempre</b><br>(total con este: ×${(elementsMult()*ELEMENT_BONUS).toFixed(2)})`,
     [
       { label:'¡FORJAR!', cb:()=>doForge(i) },
@@ -711,8 +731,8 @@ function elementTapped(i){
 }
 function doForge(i){
   const el = ELEMENTS[i];
-  if(S.protium < el.cost || nextForgeIndex() !== i) return;
-  S.protium -= el.cost;
+  if(S.h < el.cost || nextForgeIndex() !== i) return;
+  S.h -= el.cost;
   S.elements[el.sym] = 1;
   const d = elNodes[i];
   d.classList.remove('just-forged'); void d.offsetWidth;

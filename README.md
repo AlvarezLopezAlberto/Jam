@@ -28,14 +28,21 @@ lo abre fullscreen (meta apple-mobile-web-app).
    - Reactor `200K⚡` → +400/s
 3. **Combo → FUSIÓN**: taps rápidos llenan la barra; al 100% → 8s de ×5 con pantalla en modo fiebre.
 4. **Quark dorado**: cruza la pantalla cada 45–105s → ráfaga de energía o FRENESÍ ×7 por 20s.
-5. **Prestigio (Protium)**: a 1M de energía total puedes fusionar → reset a cambio de ⬡ Protium. `protium = floor(sqrt(total/1e6))`. Cada ⬡ ganado da +10% permanente (se calcula sobre el total ganado en la vida — gastarlo nunca te debilita).
-6. **Elementos (pantalla 2, la meta)**: con ⬡ forjas la tabla periódica **en orden** — H(⬡1) → He(⬡3) → Li(⬡6) → … → Ne(⬡95). Cada elemento: **+25% a todo, multiplicativo y permanente** (los 10 = ×9.3). El halo del núcleo toma el color del último elemento forjado, y un punto rosa pulsa en el tab cuando puedes forjar.
+5. **☀ COLAPSO (prestigio)**: a 1M de energía total la nebulosa puede colapsar → tus protones y neutrones **se convierten en átomos de HIDRÓGENO** (así nacen las estrellas). `H = floor(sqrt(total/1e6)) + floor((protones+neutrones)/25)`. Cada H ganado da +10% permanente (sobre el total ganado en la vida — gastarlo nunca te debilita).
+6. **Elementos (pantalla ⭐ ESTRELLA, la meta)**: con H forjas la tabla periódica **en orden** — H(1) → He(3) → Li(6) → … → Ne(95). Cada elemento: **+25% a todo, multiplicativo y permanente** (los 10 = ×9.3). El halo del núcleo toma el color del último elemento forjado, y un punto rosa pulsa en el tab cuando puedes forjar.
 7. **Offline**: al volver, tus partículas produjeron al 50% (cap 6h) con modal de bienvenida.
 
 ## Las dos pantallas
 
-- **⚛ MOTOR** — el núcleo, taps, tienda de partículas, quark dorado, prestigio. La acción.
-- **🧪 ELEMENTOS** — la colección/meta: grid de 10 elementos estilo tabla periódica, cartera de ⬡, progreso y multiplicador total. El motivo para volver.
+- **⚛ MOTOR** — la nebulosa: núcleo, taps, tienda de partículas, quark dorado, colapso. La acción.
+- **⭐ ESTRELLA** — la colección/meta: grid de elementos estilo tabla periódica, cartera de H, progreso y multiplicador total. El motivo para volver.
+
+## Hoja de ruta (Los Tres Actos)
+
+Rediseño en curso hacia **nucleosíntesis estelar real** (ver plan de los tres actos):
+1. **Acto 1 — Nebulosa** ✅: Protium→Hidrógeno, prestigio→Colapso (entregas tus partículas).
+2. **Acto 2 — Estrella**: temperatura con enfriamiento (vida media 10h, piso permanente), recetas de fusión reales (4H→He, 3He→C, escalera alfa hasta Fe), Li/Be/B por rayos cósmicos.
+3. **Acto 3 — Supernova**: prestigio mayor al llegar al hierro; Polvo Estelar + elementos pesados (r-process).
 
 ## Psicología aplicada (la investigación → el diseño)
 
