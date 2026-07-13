@@ -50,8 +50,17 @@ const ELEMENTS = [
   { z:22, sym:'Ti', name:'TITANIO',   color:'#b0c4de', via:'Ca+He (6.6K M°)' },
   { z:24, sym:'Cr', name:'CROMO',     color:'#9fe2bf', via:'Ti+He (10.5K M°)' },
   { z:26, sym:'Fe', name:'HIERRO',    color:'#d08770', via:'Cr+He (17K M°)' },
+  /* r-process: solo nacen en supernovas (1 aleatorio por explosión) */
+  { z:29, sym:'Cu', name:'COBRE',   color:'#e8935a', via:'💥 solo SUPERNOVA', heavy:true },
+  { z:47, sym:'Ag', name:'PLATA',   color:'#dcdcdc', via:'💥 solo SUPERNOVA', heavy:true },
+  { z:79, sym:'Au', name:'ORO',     color:'#ffd700', via:'💥 solo SUPERNOVA', heavy:true },
+  { z:78, sym:'Pt', name:'PLATINO', color:'#c8d8e0', via:'💥 solo SUPERNOVA', heavy:true },
+  { z:82, sym:'Pb', name:'PLOMO',   color:'#7a8a9a', via:'💥 solo SUPERNOVA', heavy:true },
+  { z:92, sym:'U',  name:'URANIO',  color:'#7dff6a', via:'💥 solo SUPERNOVA', heavy:true },
 ];
 const ELEM = {}; ELEMENTS.forEach(e=>ELEM[e.sym]=e);
+const LIGHT_ELEMENTS = ELEMENTS.filter(e=>!e.heavy);
+const HEAVY_ELEMENTS = ELEMENTS.filter(e=>e.heavy);
 
 /* recetas de fusión: consumen átomos, exigen temperatura, DEVUELVEN energía
    (la fusión es exotérmica… hasta el hierro, que no paga) */
@@ -102,7 +111,11 @@ const ACHIEVEMENTS = [
   { id:'cosmic1',  name:'Mensajero galáctico', test:s=>!!s.seen.cosmic,    msg:'Espalación por rayo cósmico' },
   { id:'elem10',   name:'Señor del Neón',      test:s=>forgedCount(s)>=10, msg:'10 elementos descubiertos' },
   { id:'fe1',      name:'Corazón de hierro',   test:s=>!!(s.elements&&s.elements.Fe), msg:'Fusionaste HIERRO' },
-  { id:'elem17',   name:'Alquimista estelar',  test:s=>forgedCount(s)>=17, msg:'¡Los 17 elementos!' },
+  { id:'elem17',   name:'Alquimista estelar',
+    test:s=>LIGHT_ELEMENTS.every(e=>s.elements&&s.elements[e.sym]), msg:'¡Los 17 elementos ligeros!' },
+  { id:'nova1',    name:'Semilla de mundos',   test:s=>!!s.seen.nova, msg:'Tu primera SUPERNOVA' },
+  { id:'heavy6',   name:'r-process completo',
+    test:s=>HEAVY_ELEMENTS.every(e=>s.elements&&s.elements[e.sym]), msg:'Los 6 pesados: ×2 extra a todo' },
 ];
 function forgedCount(s){ return Object.keys((s||S).elements||{}).length; }
 
@@ -119,6 +132,7 @@ function defaultState(){
     atoms:{},  // inventario de átomos por símbolo (H, He, C, …)
     temp:0,    // temperatura de la estrella en M°
     tempFloor:0, // piso permanente ("núcleo degenerado")
+    dust:0,    // ✦ polvo estelar (supernovas): +75% a todo c/u
     quarks:0, fevers:0,
     counts, elements:{}, ach:{}, seen:{}, muted:false, t:Date.now()
   };
@@ -149,10 +163,15 @@ function costOf(b){ return Math.ceil(b.baseCost * Math.pow(COST_GROWTH, cnt(b.id
    gastarlo en elementos nunca te debilita */
 function prestigeMult(){ return 1 + S.hEver*0.10; }
 function elementsMult(){ return Math.pow(ELEMENT_BONUS, forgedCount()); }
+/* ✦ polvo estelar: +75% por supernova; los 6 pesados completos: ×2 extra */
+function dustMult(){
+  const all6 = HEAVY_ELEMENTS.every(e=>S.elements[e.sym]);
+  return (1 + 0.75*S.dust) * (all6 ? 2 : 1);
+}
 function globalMult(){
   let m = 1;
   BUILDINGS.forEach(b=>{ if(b.mult) m += b.mult*cnt(b.id); });
-  return m * prestigeMult() * elementsMult();
+  return m * prestigeMult() * elementsMult() * dustMult();
 }
 function baseEps(){
   let e = 0;
@@ -387,21 +406,29 @@ function draw(t){
 
 const sparks = [];
 
-function pxCircle(x,y,r){
+function pxCircle(x,y,r,g=ctx){
   /* círculo por scanlines -> bordes pixelados nítidos */
   const ri = Math.max(1, Math.round(r));
   for(let dy=-ri; dy<=ri; dy++){
     const w = Math.floor(Math.sqrt(ri*ri - dy*dy));
-    ctx.fillRect((x-w)|0, (y+dy)|0, w*2+1, 1);
+    g.fillRect((x-w)|0, (y+dy)|0, w*2+1, 1);
   }
 }
-function dashEllipse(x,y,rx,ry,rot){
+function pxRing(x,y,r,g=ctx){
+  /* anillo de 1px (borde del círculo) */
+  const steps = Math.max(14, Math.round(r*5));
+  for(let i=0;i<steps;i++){
+    const a = i*(Math.PI*2/steps);
+    g.fillRect((x+Math.cos(a)*r)|0, (y+Math.sin(a)*r)|0, 1, 1);
+  }
+}
+function dashEllipse(x,y,rx,ry,rot,g=ctx){
   const steps = 40;
-  ctx.fillStyle = ctx.strokeStyle;
+  g.fillStyle = g.strokeStyle;
   for(let i=0;i<steps;i++){
     if(i%2) continue;
     const a = rot + i*(Math.PI*2/steps);
-    ctx.fillRect((x+Math.cos(a)*rx)|0, (y+Math.sin(a)*ry)|0, 1, 1);
+    g.fillRect((x+Math.cos(a)*rx)|0, (y+Math.sin(a)*ry)|0, 1, 1);
   }
 }
 
@@ -460,14 +487,14 @@ function doTap(p){
 
 /* ---------- números flotantes ---------- */
 const floaters = $('floaters');
-function spawnFloater(x,y,txt,cls=''){
-  if(floaters.children.length > 28) floaters.removeChild(floaters.firstChild);
+function spawnFloater(x,y,txt,cls='',parent=floaters){
+  if(parent.children.length > 28) parent.removeChild(parent.firstChild);
   const el = document.createElement('div');
   el.className = 'floater '+cls;
   el.textContent = txt;
   el.style.left = Math.round(x - 14 + (Math.random()*18-9)) + 'px';
   el.style.top  = Math.round(y - 18) + 'px';
-  floaters.appendChild(el);
+  parent.appendChild(el);
   setTimeout(()=>el.remove(), 900);
 }
 
@@ -695,26 +722,29 @@ function refreshPrestige(){
   else btn.hidden = true;
 }
 
-/* ---------- pantallas: motor / elementos ---------- */
+/* ---------- pantallas: motor / estrella / tabla ---------- */
 let screen = 'motor';
 function setScreen(m){
   screen = m;
   $('stage').hidden = m !== 'motor';
   $('shop').hidden = m !== 'motor';
-  $('screen-elements').hidden = m !== 'elements';
+  $('screen-star').hidden = m !== 'star';
+  $('screen-elements').hidden = m !== 'tabla';
   $('tab-motor').classList.toggle('active', m === 'motor');
-  $('tab-elements').classList.toggle('active', m === 'elements');
-  if(m === 'elements') refreshElements();
-  blip(m==='elements'? 520 : 392, .06, 'triangle', .1);
+  $('tab-star').classList.toggle('active', m === 'star');
+  $('tab-tabla').classList.toggle('active', m === 'tabla');
+  if(m === 'star'){ resizeStar(); refreshStarScreen(); }
+  if(m === 'tabla') refreshTabla();
+  blip(m==='motor'? 392 : (m==='star'? 520 : 620), .06, 'triangle', .1);
 }
 $('tab-motor').addEventListener('click', ()=>setScreen('motor'));
-$('tab-elements').addEventListener('click', ()=>setScreen('elements'));
+$('tab-star').addEventListener('click', ()=>setScreen('star'));
+$('tab-tabla').addEventListener('click', ()=>setScreen('tabla'));
 /* atajo: tocar el badge H del HUD lleva a la estrella */
-$('protium-badge').addEventListener('click', ()=>setScreen('elements'));
+$('protium-badge').addEventListener('click', ()=>setScreen('star'));
 
 /* ---------- la estrella: átomos, temperatura y fusión ---------- */
 const elNodes = [];
-const recipeNodes = [];
 const atomsOf = sym => S.atoms[sym]||0;
 
 function discover(sym){
@@ -749,7 +779,7 @@ heatBtn.addEventListener('pointerdown', ev=>{ ev.preventDefault(); heating = tru
   heatBtn.addEventListener(ev, ()=>{ heating = false; }));
 let heatBlipAcc = 0;
 function heatTick(dt){
-  if(!heating || screen!=='elements') return;
+  if(!heating || screen!=='star') return;
   const pour = Math.max(2000, eps()*8) * dt;   // energía vertida este frame
   const budget = Math.min(pour, S.e);
   if(budget <= 0) return;
@@ -793,12 +823,280 @@ function runRecipe(r, times){
   S.seen.fusedOnce = 1;
   discover(r.out);
   sndBuy(); vibrate(15);
-  const node = recipeNodes.find(n=>n.r===r);
-  if(node){ node.d.classList.remove('bought'); void node.d.offsetWidth; node.d.classList.add('bought'); }
-  refreshStar(); refreshHud(); save();
+  fuseFX(r, done, refund);
+  refreshStarScreen(); refreshHud(); save();
 }
 
-/* --- construcción de UI --- */
+/* ---------- canvas de la estrella (escena de fusión) ---------- */
+const starcv = $('starcv'), sctx = starcv.getContext('2d');
+let LW2 = 180, LH2 = 200;
+const view2 = { w:0, h:0, scale:1 };
+let sstars = [];
+const starAnims = [];
+const heatStream = [];
+
+function resizeStar(){
+  const st = $('star-stage');
+  view2.w = st.clientWidth; view2.h = st.clientHeight;
+  if(view2.w < 10 || view2.h < 10) return;
+  view2.scale = view2.w / 180;
+  LW2 = 180; LH2 = Math.max(80, Math.round(view2.h/view2.scale));
+  starcv.width = LW2; starcv.height = LH2;
+  sctx.imageSmoothingEnabled = false;
+  sstars = [];
+  const n = Math.floor(LW2*LH2/260);
+  for(let i=0;i<n;i++){
+    sstars.push({ x:Math.random()*LW2, y:Math.random()*LH2,
+      tw:Math.random()*Math.PI*2, sp:.5+Math.random()*2,
+      c:['#5e3f9e','#8a6fd0','#ffd93b','#29f3ff'][Math.floor(Math.random()*4)] });
+  }
+}
+new ResizeObserver(resizeStar).observe($('star-stage'));
+
+/* color del cuerpo estelar según temperatura (rojo→naranja→amarillo→blanco→azul) */
+const TEMP_STOPS = [
+  [0,255,79,79],[10,255,122,46],[100,255,217,59],
+  [600,255,246,200],[2600,255,255,255],[17000,139,233,253]
+];
+function tempColor(T){
+  let a = TEMP_STOPS[0], b = TEMP_STOPS[TEMP_STOPS.length-1];
+  for(let i=0;i<TEMP_STOPS.length-1;i++){
+    if(T >= TEMP_STOPS[i][0] && T <= TEMP_STOPS[i+1][0]){ a=TEMP_STOPS[i]; b=TEMP_STOPS[i+1]; break; }
+  }
+  const f = Math.max(0, Math.min(1, (T-a[0])/((b[0]-a[0])||1)));
+  return 'rgb('+[1,2,3].map(i=>Math.round(a[i]+(b[i]-a[i])*f)).join(',')+')';
+}
+function masteredRecipes(){ return RECIPES.filter(r=>S.seen['rx_'+r.out]); }
+function starCenter(){ return { x:LW2/2, y:Math.max(34, LH2*0.42) }; }
+function starRadius(){ return Math.min(46, 20 + masteredRecipes().length*2 + Math.min(10, S.temp/50)); }
+
+function drawStar(t){
+  sctx.fillStyle = '#0d0520';
+  sctx.fillRect(0,0,LW2,LH2);
+  for(const s of sstars){
+    sctx.globalAlpha = .35 + .65*Math.abs(Math.sin(t/700*s.sp + s.tw));
+    sctx.fillStyle = s.c;
+    sctx.fillRect(s.x|0, s.y|0, 1, 1);
+  }
+  sctx.globalAlpha = 1;
+
+  const c = starCenter();
+  const fe = !!S.elements.Fe;               // con corazón de hierro: gigante roja inestable
+  const pulse = Math.sin(t/(fe?160:450));
+  const R = starRadius() * (fe ? 1.18+pulse*0.1 : 1+pulse*0.03);
+  const col = fe ? '#ff4f4f' : tempColor(S.temp);
+
+  /* corona + rayos */
+  sctx.globalAlpha = .16; sctx.fillStyle = col;
+  pxCircle(c.x, c.y, R+7+pulse*2, sctx);
+  sctx.globalAlpha = .5;
+  for(let i=0;i<8;i++){
+    const a = t/2600 + i*(Math.PI/4);
+    const rr = R + 10 + ((i%2)?3:7) + pulse*2;
+    sctx.fillRect((c.x+Math.cos(a)*rr)|0, (c.y+Math.sin(a)*rr)|0, 2, 2);
+  }
+  sctx.globalAlpha = 1;
+
+  /* cuerpo */
+  sctx.fillStyle = '#2a0f22'; pxCircle(c.x, c.y+2, R+1, sctx);
+  sctx.fillStyle = col;       pxCircle(c.x, c.y, R, sctx);
+  sctx.globalAlpha = .5; sctx.fillStyle = '#ffffff';
+  pxCircle(c.x - R*0.35, c.y - R*0.35, R*0.25, sctx);
+  sctx.globalAlpha = 1;
+
+  /* capas de cebolla: un anillo por receta dominada (estructura real) */
+  const mast = masteredRecipes();
+  mast.forEach((r,i)=>{
+    const rr = R * (1 - (i+1)/(mast.length+1.5));
+    if(rr < 2) return;
+    sctx.globalAlpha = .55;
+    sctx.fillStyle = ELEM[r.out].color;
+    pxRing(c.x, c.y, rr, sctx);
+  });
+  sctx.globalAlpha = 1;
+
+  /* chorro de energía al calentar */
+  if(heating && screen==='star' && S.e > 0){
+    for(let i=0;i<2;i++) heatStream.push({ x:Math.random()*LW2, y:LH2+2 });
+  }
+  for(let i=heatStream.length-1;i>=0;i--){
+    const p = heatStream[i];
+    const dx = c.x-p.x, dy = c.y-p.y;
+    p.x += dx*0.09; p.y += dy*0.09;
+    if(Math.abs(dx)<4 && Math.abs(dy)<4){ heatStream.splice(i,1); continue; }
+    sctx.fillStyle = Math.random()<.5 ? '#ffd93b' : '#ff7a2e';
+    sctx.fillRect(p.x|0, p.y|0, 2, 2);
+  }
+
+  /* animaciones de fusión / supernova */
+  for(let i=starAnims.length-1;i>=0;i--){
+    const a = starAnims[i];
+    const dt = (t - a.t0)/1000;
+    if(dt < 0) continue;
+    if(a.k==='in'){
+      if(dt > a.dur){ starAnims.splice(i,1); continue; }
+      const f = dt/a.dur;
+      const x = a.x0+(c.x-a.x0)*f, y = a.y0+(c.y-a.y0)*f;
+      sctx.fillStyle = a.color; pxCircle(x, y, 3, sctx);
+    }else if(a.k==='flash'){
+      if(dt > 0.25){ starAnims.splice(i,1); continue; }
+      sctx.globalAlpha = 1 - dt/0.25;
+      sctx.fillStyle = '#ffffff';
+      pxCircle(c.x, c.y, R*(0.5+dt*3), sctx);
+      sctx.globalAlpha = 1;
+    }else if(a.k==='out'){
+      if(dt > 0.9){ starAnims.splice(i,1); continue; }
+      const f = dt/0.9;
+      sctx.globalAlpha = 1 - f*0.7;
+      sctx.fillStyle = a.color;
+      pxCircle(c.x, c.y - (R+14)*f - 6, 4.5, sctx);
+      sctx.globalAlpha = 1;
+    }else if(a.k==='nova'){
+      if(dt > 1.6){ starAnims.splice(i,1); continue; }
+      sctx.globalAlpha = Math.max(0, 1 - dt/1.6);
+      sctx.fillStyle = '#ffffff'; pxRing(c.x, c.y, dt*90, sctx);
+      sctx.fillStyle = '#ffd93b'; pxRing(c.x, c.y, dt*63, sctx);
+      sctx.fillStyle = '#ff4f4f'; pxRing(c.x, c.y, dt*40, sctx);
+      sctx.globalAlpha = 1;
+    }
+  }
+}
+
+/* fx al fusionar: los ingredientes vuelan al núcleo, flash, sale el producto */
+function fuseFX(r, done, refund){
+  const t = now();
+  const c = starCenter();
+  let idx = 0;
+  Object.entries(r.in).forEach(([sym,qty])=>{
+    const n = Math.min(qty*Math.min(done,3), 9);
+    for(let i=0;i<n;i++){
+      const a = Math.random()*Math.PI*2;
+      starAnims.push({ k:'in', color:ELEM[sym].color,
+        x0:c.x+Math.cos(a)*(LW2*0.55), y0:c.y+Math.sin(a)*(LH2*0.45),
+        t0:t+idx*40, dur:0.38+Math.random()*0.12 });
+      idx++;
+    }
+  });
+  starAnims.push({ k:'flash', t0:t+420 });
+  starAnims.push({ k:'out', color:ELEM[r.out].color, t0:t+500 });
+  if(refund>0){
+    spawnFloater(c.x*view2.scale, c.y*view2.scale - 24,
+      '+'+fmt(refund)+'⚡', 'gold', $('star-floaters'));
+  }
+}
+
+/* ---------- UI de la estrella: bolitas, reactor y chips ---------- */
+function ballEl(sym, size, big=false){
+  const el = ELEM[sym];
+  const d = document.createElement('span');
+  d.className = 'ball'+(big?' big':'');
+  const c2 = document.createElement('canvas');
+  c2.width = 9; c2.height = 9;
+  const g = c2.getContext('2d');
+  const ball = (x,y,r,col)=>{
+    g.fillStyle = col;
+    for(let dy=-r;dy<=r;dy++){
+      const w = Math.floor(Math.sqrt(r*r-dy*dy));
+      g.fillRect(x-w, y+dy, w*2+1, 1);
+    }
+  };
+  ball(4,4,4,'#160a2e'); ball(4,4,3.5,el.color);
+  g.fillStyle = 'rgba(255,255,255,.75)'; g.fillRect(2,2,1,1);
+  c2.style.width = size+'px'; c2.style.height = size+'px';
+  const s = document.createElement('span');
+  s.className = 'bsym'; s.textContent = el.sym;
+  d.append(c2, s);
+  return d;
+}
+
+let selRecipe = RECIPES[0];
+const chipNodes = [];
+let chipsSig = '';
+function rebuildChips(){
+  const vis = RECIPES.filter(recipeVisible);
+  const sig = vis.map(r=>r.out).join(',');
+  if(sig === chipsSig) return;
+  chipsSig = sig;
+  const box = $('chips');
+  box.innerHTML = ''; chipNodes.length = 0;
+  vis.forEach(r=>{
+    const d = document.createElement('button');
+    d.className = 'chip';
+    d.appendChild(ballEl(r.out, 20, true));
+    const tEl = document.createElement('span');
+    tEl.className = 'chip-t'; tEl.textContent = fmt(r.temp)+'°';
+    d.appendChild(tEl);
+    d.addEventListener('click', ()=>{ selRecipe = r; buildReactor(); refreshStarScreen(); blip(500,.05,'triangle',.08); });
+    box.appendChild(d);
+    chipNodes.push({ r, d });
+  });
+  /* tease: la siguiente receta aún oculta */
+  const nextHidden = RECIPES.find(r=>!recipeVisible(r));
+  if(nextHidden){
+    const d = document.createElement('button');
+    d.className = 'chip locked';
+    const q = document.createElement('span');
+    q.style.fontSize = '14px'; q.textContent = '?';
+    const tEl = document.createElement('span');
+    tEl.className = 'chip-t'; tEl.textContent = fmt(nextHidden.temp)+'°';
+    d.append(q, tEl);
+    box.appendChild(d);
+  }
+  if(!vis.includes(selRecipe)) selRecipe = vis[0] || RECIPES[0];
+  buildReactor();
+}
+
+let reactorRefs = [];
+function buildReactor(){
+  const r = selRecipe;
+  const box = $('reactor');
+  box.innerHTML = ''; reactorRefs = [];
+  Object.entries(r.in).forEach(([sym,qty],gi)=>{
+    if(gi>0){
+      const p = document.createElement('span');
+      p.className = 'op'; p.textContent = '+';
+      box.appendChild(p);
+    }
+    const g = document.createElement('div'); g.className = 'slot-group';
+    const balls = document.createElement('div'); balls.className = 'slot-balls';
+    for(let i=0;i<qty;i++) balls.appendChild(ballEl(sym, 14));
+    const cntEl = document.createElement('div'); cntEl.className = 'slot-count';
+    g.append(balls, cntEl); box.appendChild(g);
+    reactorRefs.push({ sym, qty, cntEl, gEl:g });
+  });
+  const arrow = document.createElement('span');
+  arrow.className = 'op'; arrow.textContent = '→';
+  box.appendChild(arrow);
+  const pg = document.createElement('div'); pg.className = 'slot-group';
+  const pb = document.createElement('div'); pb.className = 'slot-balls';
+  pb.appendChild(ballEl(r.out, 22, true));
+  const pc = document.createElement('div'); pc.className = 'slot-count';
+  pg.append(pb, pc); box.appendChild(pg);
+  reactorRefs.push({ sym:r.out, qty:0, cntEl:pc, gEl:pg, product:true });
+}
+
+/* fusionar con feedback visual (sin textos): frío→gauge azul, faltan→bolitas rojas */
+function attemptFuse(times){
+  const st = canRun(selRecipe);
+  if(st === 'ok'){ runRecipe(selRecipe, times); return; }
+  if(st === 'frio'){
+    const g = $('temp-gauge');
+    g.classList.remove('flash-cold'); void g.offsetWidth; g.classList.add('flash-cold');
+    blip(140,.12,'square',.1);
+  }else{
+    reactorRefs.forEach(rr=>{
+      if(!rr.product && atomsOf(rr.sym) < rr.qty){
+        rr.gEl.classList.remove('flash-miss'); void rr.gEl.offsetWidth; rr.gEl.classList.add('flash-miss');
+      }
+    });
+    blip(110,.12,'square',.1);
+  }
+  vibrate(30);
+}
+$('fuse-btn').addEventListener('pointerdown', ev=>{ ev.preventDefault(); attemptFuse(1); }, {passive:false});
+$('fuse10-btn').addEventListener('pointerdown', ev=>{ ev.preventDefault(); attemptFuse(10); }, {passive:false});
+
+/* ---------- construcción de la tabla ---------- */
 function buildElements(){
   const grid = $('elements-grid');
   grid.innerHTML = '';
@@ -811,27 +1109,7 @@ function buildElements(){
     grid.appendChild(d);
     elNodes[i] = d;
   });
-  const rc = $('recipes');
-  rc.innerHTML = '';
-  recipeNodes.length = 0;
-  RECIPES.forEach(r=>{
-    const d = document.createElement('div');
-    d.className = 'recipe hidden-r';
-    const io = Object.entries(r.in).map(([k,v])=>v+' '+k).join(' + ');
-    d.innerHTML =
-      `<div class="r-body"><div class="r-io">${io} → <b>${r.out}</b></div>`+
-      `<div class="r-meta">🌡 ${fmt(r.temp)} M° · ${r.refund>0?'+⚡'+fmt(r.refund):'sin energía'} · ${r.note}</div></div>`+
-      `<div class="r-btns"></div>`;
-    const btns = d.querySelector('.r-btns');
-    [1,10].forEach(n=>{
-      const b = document.createElement('button');
-      b.textContent = '×'+n;
-      b.addEventListener('pointerdown', ev=>{ ev.preventDefault(); runRecipe(r,n); }, {passive:false});
-      btns.appendChild(b);
-    });
-    rc.appendChild(d);
-    recipeNodes.push({ r, d, btns:[...btns.children] });
-  });
+  rebuildChips();
 }
 
 function elementTapped(i){
@@ -845,34 +1123,45 @@ function elementTapped(i){
     [{ label:'OK', cb:()=>{} }]);
 }
 
-/* --- refresco de la pantalla estrella --- */
-function refreshStar(){
+/* ---------- refrescos ---------- */
+function anyRecipeReady(){ return RECIPES.some(r=>recipeVisible(r) && canRun(r)==='ok'); }
+
+function refreshStarScreen(){
+  rebuildChips();
+  const r = selRecipe;
+  /* gauge: el tick es la meta térmica de la receta elegida */
+  $('temp-val').textContent = fmt(Math.floor(S.temp))+'°';
+  const scale = Math.max(r.temp*1.15, S.temp*1.05, 12);
+  $('temp-fill').style.width = Math.min(100, S.temp/scale*100)+'%';
+  $('temp-floor-fill').style.width = Math.min(100, S.tempFloor/scale*100)+'%';
+  const tick = $('temp-tick');
+  tick.style.left = Math.min(98.5, r.temp/scale*100)+'%';
+  tick.style.background = ELEM[r.out].color;
+  /* chips */
+  chipNodes.forEach(({r:cr,d})=>{
+    const st = canRun(cr);
+    d.classList.toggle('sel', cr===r);
+    d.classList.toggle('ready', st==='ok');
+    d.classList.toggle('cold', st==='frio');
+  });
+  /* reactor */
+  reactorRefs.forEach(rr=>{
+    rr.cntEl.textContent = '×'+fmt(atomsOf(rr.sym));
+    if(!rr.product) rr.gEl.classList.toggle('miss', atomsOf(rr.sym) < rr.qty);
+  });
+  /* botones */
+  const ok = canRun(r)==='ok';
+  $('fuse-btn').classList.toggle('ready', ok);
+  $('fuse-btn').classList.toggle('off', !ok);
+  $('fuse10-btn').classList.toggle('off', !ok);
+  /* supernova disponible con corazón de hierro */
+  $('nova-btn').hidden = !S.elements.Fe;
+}
+
+function refreshTabla(){
   $('el-wallet').textContent = 'H × '+fmt(atomsOf('H'));
   $('el-progress').textContent = forgedCount()+'/'+ELEMENTS.length;
-  $('el-mult').textContent = '×'+elementsMult().toFixed(2)+' A TODO';
-
-  /* temperatura */
-  $('temp-val').textContent = '🌡 '+fmt(Math.floor(S.temp))+' M°';
-  const nextR = RECIPES.find(r=>recipeVisible(r) && S.temp < r.temp);
-  $('temp-next').textContent = nextR ? (nextR.out+' a '+fmt(nextR.temp)+' M°') : '¡máximo alcanzado!';
-  const goal = nextR ? nextR.temp : Math.max(S.temp,1);
-  $('temp-fill').style.width = Math.min(100, S.temp/goal*100)+'%';
-  $('temp-floor').textContent = 'piso permanente: '+fmt(Math.floor(S.tempFloor))+' M° · se enfría a la mitad cada 10 h';
-
-  /* recetas */
-  let anyReady = false;
-  recipeNodes.forEach(({r,d,btns})=>{
-    const vis = recipeVisible(r);
-    d.classList.toggle('hidden-r', !vis);
-    if(!vis) return;
-    const st = canRun(r);
-    d.classList.toggle('hot', S.temp >= r.temp);
-    d.classList.toggle('ready', st==='ok');
-    btns.forEach(b=>b.disabled = st!=='ok');
-    if(st==='ok') anyReady = true;
-  });
-
-  /* tiles */
+  $('el-mult').textContent = '×'+(elementsMult()*dustMult()).toFixed(2)+' A TODO';
   ELEMENTS.forEach((el,i)=>{
     const d = elNodes[i];
     const cost = d.querySelector('.el-cost');
@@ -882,14 +1171,10 @@ function refreshStar(){
       cost.textContent = '×'+fmt(atomsOf(el.sym));
     }else{
       d.classList.add('locked');
-      cost.textContent = '?';
+      cost.textContent = el.heavy ? '💥' : '?';
     }
   });
-
-  /* aviso en el tab: fusión lista o H por reclamar */
-  $('tab-elements').querySelector('.nav-dot').hidden = !(anyReady || pendingH()>=1);
-
-  /* hint dinámico: el siguiente paso, siempre */
+  /* hint educativo (la tabla sí lleva texto) */
   const hint = $('elements-hint');
   const pend = pendingH();
   if(!S.elements.H){
@@ -898,20 +1183,74 @@ function refreshStar(){
     hint.textContent = pend>=1
       ? pend+' H por reclamar → botón ☀ COLAPSO en el motor'
       : 'Consigue H: llega a '+fmt(target)+' de energía total y COLAPSA — vas al '+pct+'%';
-  }else if(anyReady){
-    hint.textContent = '¡FUSIONA! Las recetas verdes están listas';
-  }else if(nextR && S.temp < nextR.temp && Object.keys(nextR.in).every(k=>atomsOf(k)>=nextR.in[k])){
-    hint.textContent = 'Mantén 🔥 CALENTAR hasta '+fmt(nextR.temp)+' M° para fundir '+nextR.out;
-  }else if(atomsOf('H') < 4 && pend >= 1){
-    hint.textContent = pend+' H por reclamar → botón ☀ COLAPSO en el motor';
-  }else if(atomsOf('H') < 4){
-    hint.textContent = 'Junta H colapsando la nebulosa (4 H = 1 He) — tus protones y neutrones dan H extra';
+  }else if(anyRecipeReady()){
+    hint.textContent = '¡Hay fusión lista en la ⭐ ESTRELLA!';
+  }else if(S.elements.Fe){
+    hint.textContent = 'Corazón de hierro: la fusión ya no paga… 💥 la SUPERNOVA te espera';
   }else{
-    hint.textContent = 'Acumula átomos y calor: la escalera alfa sube hasta el HIERRO';
+    hint.textContent = 'La escalera alfa sube hasta el HIERRO — los pesados nacen en supernovas';
   }
 }
-/* alias para el resto del código */
-const refreshElements = refreshStar;
+
+function refreshElements(){
+  if(screen === 'star') refreshStarScreen();
+  else if(screen === 'tabla') refreshTabla();
+  $('tab-star').querySelector('.nav-dot').hidden = !anyRecipeReady();
+  $('tab-tabla').querySelector('.nav-dot').hidden = true;
+}
+
+/* ---------- SUPERNOVA (Acto 3) ---------- */
+$('nova-btn').addEventListener('click', ()=>{
+  if(!S.elements.Fe) return;
+  const atomsTotal = Object.values(S.atoms).reduce((a,b)=>a+(b||0),0);
+  const gain = 1 + Math.floor(atomsTotal/200);
+  showModal('💥 SUPERNOVA',
+    `Tu estrella tiene un <b>corazón de HIERRO</b>:<br>la fusión ya no devuelve energía.<br>`+
+    `Solo queda el colapso final… y la EXPLOSIÓN.<br><br>`+
+    `Pierdes: energía, partículas, átomos y calor<br>(el piso térmico conserva un 25%).<br>`+
+    `Conservas: elementos descubiertos y tu H de por vida.<br><br>`+
+    `Ganas <b>✦ ${gain} POLVO ESTELAR</b> (+${gain*75}% a todo)<br>`+
+    `y naces con <b>1 elemento pesado</b> (proceso-r)`,
+    [
+      { label:'¡EXPLOTAR!', cb:()=>doSupernova(gain) },
+      { label:'Aún no', alt:true, cb:()=>{} },
+    ]);
+});
+function doSupernova(gain){
+  /* reset de la generación */
+  S.e = 0;
+  BUILDINGS.forEach(b=>S.counts[b.id]=0);
+  S.atoms = {};
+  S.tempFloor = Math.floor(S.tempFloor*0.25);   // metalicidad: algo queda
+  S.temp = S.tempFloor;
+  heat = 0; buffs.feverUntil = 0; buffs.frenzyUntil = 0;
+  blob = [];
+  Object.values(shopNodes).forEach(n=>{ n.revealed=false; n.d.classList.add('locked'); n.nm.textContent='???'; n.info.textContent=''; });
+  stage.classList.remove('fever');
+  /* botín */
+  S.dust += gain;
+  S.seen.nova = 1;
+  const missing = HEAVY_ELEMENTS.filter(e=>!S.elements[e.sym]);
+  if(missing.length){
+    const el = missing[Math.floor(Math.random()*missing.length)];
+    S.atoms[el.sym] = 1;
+    discover(el.sym);
+  }else{
+    S.dust += 1;   // ya lo tienes todo: polvo extra
+  }
+  /* fx */
+  const f = $('nova-flash');
+  f.hidden = false;
+  f.style.animation = 'none'; void f.offsetWidth; f.style.animation = '';
+  setTimeout(()=>{ f.hidden = true; }, 1700);
+  starAnims.push({ k:'nova', t0: now() });
+  const c = nucleusCenter();
+  burst(c.x, c.y, '#ffd93b', 80, 3);
+  burst(c.x, c.y, '#ff4f4f', 60, 2.4);
+  shake(); sndGold(); vibrate([60,80,60,80,140]);
+  toast('💥 ¡SUPERNOVA! ✦'+gain+' — todo el oro del universo nació en una explosión así');
+  refreshStarScreen(); refreshShop(); refreshHud(); save();
+}
 const toastQ = [];
 let toastBusy = false;
 function toast(msg){
@@ -1018,6 +1357,8 @@ function frame(t){
   if(screen === 'motor'){
     maybeQuark(t);
     draw(t);
+  }else if(screen === 'star'){
+    drawStar(t);
   }
 
   accUi += dt;

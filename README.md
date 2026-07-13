@@ -36,17 +36,22 @@ lo abre fullscreen (meta apple-mobile-web-app).
    - Cada elemento descubierto: **+25% a todo, multiplicativo y permanente** (17 elementos = ×44). El calor además da +0.5% de energía/s por M°. El núcleo del motor evoluciona de nebulosa rosa → estrella joven → madura → gigante azul según lo que fundas.
 7. **Offline**: al volver, tus partículas produjeron al 50% (cap 6h) con modal de bienvenida.
 
-## Las dos pantallas
+## Las tres pantallas
 
 - **⚛ MOTOR** — la nebulosa: núcleo, taps, tienda de partículas, quark dorado, colapso. La acción.
-- **⭐ ESTRELLA** — la colección/meta: grid de elementos estilo tabla periódica, cartera de H, progreso y multiplicador total. El motivo para volver.
+- **⭐ ESTRELLA** — la forja visual: una estrella pixel art viva (color por temperatura, capas de cebolla por receta dominada, corona pulsante). La fusión se entiende **sin texto**: el reactor muestra la receta como pictograma (4 bolitas H → bolita He), el gauge lleva un tick de color con la meta térmica de la receta elegida, y al fusionar los átomos VUELAN al núcleo, flash, y el producto sale disparado. Feedback de error también visual: frío = gauge parpadea azul; faltan átomos = las bolitas tiemblan en rojo.
+- **🧪 TABLA** — la colección: 23 tiles (17 ligeros + 6 pesados de supernova), conteos de átomos, progreso y multiplicador. Tap en un tile = ficha del elemento con su origen.
+
+## 💥 Supernova (prestigio mayor)
+
+Al fusionar **Fe** la estrella se vuelve una gigante roja inestable y aparece el botón SUPERNOVA: explosión (flash blanco + anillos expansivos), pierdes energía/partículas/átomos/calor (el piso térmico conserva 25% — metalicidad), conservas la colección, y ganas **✦ Polvo Estelar** (`1 + átomos/200`, +75% a todo c/u) más **1 elemento pesado aleatorio** de {Cu, Ag, Au, Pt, Pb, U} — el proceso-r real. Los 6 pesados completos: ×2 extra.
 
 ## Hoja de ruta (Los Tres Actos)
 
 Rediseño en curso hacia **nucleosíntesis estelar real** (ver plan de los tres actos):
 1. **Acto 1 — Nebulosa** ✅: Protium→Hidrógeno, prestigio→Colapso (entregas tus partículas).
 2. **Acto 2 — Estrella** ✅: temperatura con enfriamiento (vida media 10h, piso permanente), recetas de fusión reales (4H→He, 3He→C, escalera alfa hasta Fe), Li/Be/B por rayos cósmicos.
-3. **Acto 3 — Supernova**: prestigio mayor al llegar al hierro; Polvo Estelar + elementos pesados (r-process).
+3. **Acto 3 — Supernova** ✅: prestigio mayor al llegar al hierro; Polvo Estelar + elementos pesados (r-process). Incluye el rediseño a 3 pantallas con la estrella como escena visual de fusión.
 
 ## Psicología aplicada (la investigación → el diseño)
 

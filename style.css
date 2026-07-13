@@ -346,84 +346,192 @@ html,body{
 #el-progress{color:var(--cyan)}
 #el-mult{color:var(--pink)}
 
-/* panel de la estrella: temperatura */
-#star-panel{
-  background:#1c0b3a;
-  border:3px solid var(--orange);
-  border-radius:10px;
-  padding:10px;
+/* ============ PANTALLA ESTRELLA (fusión visual) ============ */
+#screen-star{
+  flex:1;
+  min-height:0;
+  display:flex;
+  flex-direction:column;
+  background:var(--bg);
+}
+#star-stage{
+  position:relative;
+  flex:1;
+  min-height:80px;
+  overflow:hidden;
+}
+#starcv{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated}
+#star-floaters{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:4}
+
+#star-ui{
   display:flex;
   flex-direction:column;
   gap:8px;
+  padding:8px 10px 10px;
+  background:linear-gradient(180deg, rgba(20,8,43,0), #1c0b3a 25%);
 }
-#temp-row{
-  display:flex;
-  justify-content:space-between;
-  align-items:baseline;
-  font-size:9px;
-}
-#temp-val{color:var(--orange);text-shadow:0 0 8px rgba(255,122,46,.6)}
-#temp-next{color:var(--cyan);font-size:7px}
-#temp-gauge{
-  height:12px;
-  background:rgba(0,0,0,.55);
-  border:2px solid rgba(255,255,255,.35);
-  border-radius:3px;
-  overflow:hidden;
-}
-#temp-fill{
-  height:100%;
-  width:0%;
-  background:linear-gradient(90deg,#a3151f,var(--orange),var(--yellow));
-  transition:width .15s linear;
-}
-#temp-floor{font-size:6px;color:rgba(255,246,255,.45)}
+#gauge-row{display:flex;align-items:center;gap:8px}
 #heat-btn{
   font-family:var(--px-font);
-  font-size:9px;
-  padding:12px 8px;
-  color:#3a1200;
+  font-size:16px;
+  width:52px;height:44px;
+  flex:none;
   background:linear-gradient(180deg,var(--yellow),var(--orange));
   border:3px solid #fff;
   border-radius:8px;
   box-shadow:0 4px 0 #a3540f;
   touch-action:none;
 }
-#heat-btn:active,#heat-btn.heating{transform:translateY(3px);box-shadow:0 1px 0 #a3540f}
-#heat-btn:disabled{filter:grayscale(.8) brightness(.55)}
+#heat-btn:active{transform:translateY(3px);box-shadow:0 1px 0 #a3540f}
+#temp-gauge{
+  position:relative;
+  flex:1;
+  height:16px;
+  background:rgba(0,0,0,.55);
+  border:2px solid rgba(255,255,255,.35);
+  border-radius:3px;
+}
+#temp-floor-fill{position:absolute;left:0;top:0;bottom:0;width:0%;background:rgba(255,122,46,.28)}
+#temp-fill{
+  position:absolute;left:0;top:0;bottom:0;width:0%;
+  background:linear-gradient(90deg,#a3151f,var(--orange),var(--yellow));
+  transition:width .12s linear;
+}
+#temp-tick{
+  position:absolute;top:-4px;bottom:-4px;width:3px;left:100%;
+  background:#fff;
+  box-shadow:0 0 6px var(--cyan);
+}
+#temp-gauge.flash-cold{animation:cold-flash .45s ease-out}
+@keyframes cold-flash{
+  0%{box-shadow:0 0 0 4px var(--cyan)}
+  100%{box-shadow:0 0 0 0 transparent}
+}
+#temp-val{font-size:9px;color:var(--orange);min-width:54px;text-align:right;flex:none}
 
-/* recetas de fusión */
-#recipes{display:flex;flex-direction:column;gap:8px}
-.recipe{
+/* reactor: la receta como pictograma */
+#reactor{
   display:flex;
   align-items:center;
-  gap:8px;
+  justify-content:center;
+  gap:7px;
+  min-height:58px;
+  flex-wrap:wrap;
   background:#241046;
   border:3px solid var(--purple);
-  border-radius:8px;
-  padding:8px;
+  border-radius:10px;
+  padding:7px;
 }
-.recipe.hot{border-color:var(--orange)}
-.recipe.ready{border-color:#7dff6a;box-shadow:0 0 10px rgba(125,255,106,.35)}
-.recipe.hidden-r{display:none}
-.r-body{flex:1;min-width:0}
-.r-io{font-size:8px;line-height:1.5;color:var(--white)}
-.r-io b{color:var(--yellow)}
-.r-meta{font-size:6px;line-height:1.7;color:var(--cyan);opacity:.85}
-.r-btns{display:flex;flex-direction:column;gap:5px}
-.r-btns button{
+.slot-group{display:flex;flex-direction:column;align-items:center;gap:3px}
+.slot-balls{display:flex;gap:2px}
+.slot-count{font-size:7px;color:var(--cyan)}
+.slot-group.miss .slot-count{color:#ff4f4f}
+.slot-group.flash-miss{animation:miss-shake .35s}
+@keyframes miss-shake{
+  0%,100%{transform:translateX(0)}
+  25%{transform:translateX(-4px)}
+  50%{transform:translateX(4px)}
+  75%{transform:translateX(-3px)}
+}
+.op{font-size:12px;color:var(--white);opacity:.7;font-family:var(--px-font)}
+.ball{position:relative;display:inline-flex;align-items:center;justify-content:center}
+.ball canvas{image-rendering:pixelated;display:block}
+.ball .bsym{
+  position:absolute;
   font-family:var(--px-font);
-  font-size:8px;
-  padding:8px 9px;
+  font-size:6px;
+  color:#160a2e;
+  text-shadow:0 0 2px rgba(255,255,255,.8);
+}
+.ball.big .bsym{font-size:8px}
+
+#fuse-row{display:flex;gap:8px}
+#fuse-btn{
+  flex:1;
+  font-family:var(--px-font);
+  font-size:11px;
+  padding:12px;
   color:#fff;
   background:var(--pink);
-  border:2px solid #fff;
-  border-radius:6px;
-  box-shadow:0 2px 0 #8a1246;
+  border:3px solid #fff;
+  border-radius:8px;
+  box-shadow:0 4px 0 #8a1246;
 }
-.r-btns button:disabled{filter:grayscale(.9) brightness(.5);box-shadow:none}
-.r-btns button:not(:disabled):active{transform:translateY(2px);box-shadow:none}
-.recipe.bought{animation:bought .25s ease-out}
+#fuse10-btn{
+  font-family:var(--px-font);
+  font-size:10px;
+  padding:12px 14px;
+  color:#fff;
+  background:#3a2a5e;
+  border:3px solid #fff;
+  border-radius:8px;
+  box-shadow:0 4px 0 #1c1230;
+}
+#fuse-btn:not(.off):active,#fuse10-btn:not(.off):active{transform:translateY(3px);box-shadow:none}
+#fuse-btn.ready{animation:can-glow 1s ease-in-out infinite alternate}
+#fuse-btn.off,#fuse10-btn.off{filter:grayscale(.85) brightness(.55)}
+
+/* chips: selector de recetas */
+#chips{
+  display:flex;
+  gap:7px;
+  overflow-x:auto;
+  overflow-y:hidden;
+  padding:4px 0 2px;
+  scrollbar-width:none;
+}
+#chips::-webkit-scrollbar{display:none}
+.chip{
+  flex:none;
+  width:48px;height:58px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:4px;
+  font-family:var(--px-font);
+  background:#241046;
+  border:3px solid #3a2a5e;
+  border-radius:8px;
+  color:var(--white);
+}
+.chip .chip-t{font-size:6px;color:var(--orange)}
+.chip.sel{border-color:var(--yellow);box-shadow:0 0 10px rgba(255,217,59,.4)}
+.chip.cold{border-color:#2b6a8a}
+.chip.cold .chip-t{color:var(--cyan)}
+.chip.ready{border-color:#7dff6a}
+.chip.ready:not(.sel){animation:can-glow 1s ease-in-out infinite alternate}
+.chip.locked{filter:grayscale(1) brightness(.4)}
+
+/* supernova */
+#nova-btn{
+  position:absolute;
+  top:10px;left:50%;
+  transform:translateX(-50%);
+  font-family:var(--px-font);
+  font-size:10px;
+  color:#fff;
+  background:linear-gradient(180deg,#ff4f4f,#a3151f);
+  border:3px solid #fff;
+  border-radius:8px;
+  padding:10px 12px;
+  box-shadow:0 0 18px rgba(255,79,79,.8),0 4px 0 #5c0a0a;
+  z-index:5;
+  animation:prestige-glow 1s ease-in-out infinite alternate;
+}
+#nova-btn:active{transform:translateX(-50%) translateY(3px)}
+#nova-flash{
+  position:fixed;inset:0;
+  background:#fff;
+  z-index:100;
+  pointer-events:none;
+  animation:nova-fade 1.6s ease-out forwards;
+}
+@keyframes nova-fade{
+  0%{opacity:0}
+  8%{opacity:1}
+  100%{opacity:0}
+}
 
 #elements-grid{
   display:grid;

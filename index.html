@@ -38,25 +38,37 @@
     <button id="prestige-btn" hidden>☀ ¡COLAPSO!</button>
   </div>
 
+  <div id="screen-star" hidden>
+    <div id="star-stage">
+      <canvas id="starcv"></canvas>
+      <div id="star-floaters"></div>
+      <button id="nova-btn" hidden>💥 SUPERNOVA</button>
+    </div>
+    <div id="star-ui">
+      <div id="gauge-row">
+        <button id="heat-btn">🔥</button>
+        <div id="temp-gauge">
+          <div id="temp-floor-fill"></div>
+          <div id="temp-fill"></div>
+          <div id="temp-tick"></div>
+        </div>
+        <div id="temp-val">0°</div>
+      </div>
+      <div id="reactor"></div>
+      <div id="fuse-row">
+        <button id="fuse-btn">⚛ FUSIONAR</button>
+        <button id="fuse10-btn">×10</button>
+      </div>
+      <div id="chips"></div>
+    </div>
+  </div>
+
   <div id="screen-elements" hidden>
     <div id="elements-head">
       <div id="el-wallet">H × 0</div>
-      <div id="el-progress">0/17</div>
+      <div id="el-progress">0/23</div>
       <div id="el-mult">×1.00 A TODO</div>
     </div>
-
-    <div id="star-panel">
-      <div id="temp-row">
-        <div id="temp-val">🌡 0 M°</div>
-        <div id="temp-next"></div>
-      </div>
-      <div id="temp-gauge"><div id="temp-fill"></div></div>
-      <div id="temp-floor">piso: 0 M°</div>
-      <button id="heat-btn">🔥 CALENTAR (mantén presionado)</button>
-    </div>
-
-    <div id="recipes"></div>
-
     <div id="elements-grid"></div>
     <div id="elements-hint">Gana HIDRÓGENO con el ☀ COLAPSO en el motor</div>
   </div>
@@ -65,8 +77,11 @@
 
   <nav id="nav">
     <button class="nav-tab active" id="tab-motor">⚛ MOTOR</button>
-    <button class="nav-tab" id="tab-elements">⭐ ESTRELLA<span class="nav-dot" hidden></span></button>
+    <button class="nav-tab" id="tab-star">⭐ ESTRELLA<span class="nav-dot" hidden></span></button>
+    <button class="nav-tab" id="tab-tabla">🧪 TABLA<span class="nav-dot" hidden></span></button>
   </nav>
+
+  <div id="nova-flash" hidden></div>
 
   <div id="toast" hidden></div>
 
