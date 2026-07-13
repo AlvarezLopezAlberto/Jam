@@ -20,12 +20,12 @@ lo abre fullscreen (meta apple-mobile-web-app).
 ## El loop
 
 1. **TAP al átomo** → +energía (números flotantes, partículas, squash, blip que sube de tono con el combo).
-2. **Compra partículas** (barra inferior, estilo Mucho Taco):
-   - Protón `15⚡` → +1/s (ingreso pasivo)
-   - Electrón `100⚡` → +1 por tap
-   - Neutrino `1.5K⚡` → +10% a TODO
-   - Neutrón `12K⚡` → +30/s
-   - Reactor `200K⚡` → +400/s
+2. **Compra potenciadores de la nebulosa** (barra inferior, estilo Mucho Taco — cada uno con física real detrás):
+   - Protón `15⚡` → +1/s (su masa calienta la nube por contracción gravitatoria)
+   - Electrón `100⚡` → +1 por tap (tus taps los excitan y reemiten radiación)
+   - Onda de choque `1.5K⚡` → +10% a TODO (las supernovas vecinas comprimen la nebulosa — el disparador real del colapso)
+   - Neutrón `12K⚡` → +30/s (masa pesada)
+   - Protoestrella `200K⚡` → +400/s (un núcleo denso que ya arde)
 3. **Combo → FUSIÓN**: taps rápidos llenan la barra; al 100% → 8s de ×5 con pantalla en modo fiebre.
 4. **Quark dorado**: cruza la pantalla cada 45–105s → ráfaga de energía o FRENESÍ ×7 por 20s.
 5. **☀ COLAPSO (prestigio)**: a 1M de energía total la nebulosa puede colapsar → tus protones y neutrones **se convierten en átomos de HIDRÓGENO** (así nacen las estrellas). `H = floor(sqrt(total/1e6)) + floor((protones+neutrones)/25)`. Cada H ganado da +10% permanente (sobre el total ganado en la vida — gastarlo nunca te debilita).

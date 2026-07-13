@@ -6,17 +6,22 @@
    ============================================================ */
 
 /* ---------- catálogo de partículas (edificios) ---------- */
+/* La ficción del motor: eres una NEBULOSA. La masa (protones/neutrones)
+   calienta la nube por contracción gravitatoria; tus taps excitan electrones
+   que reemiten radiación; las ondas de choque de supernovas vecinas comprimen
+   la nube (así se dispara el colapso real); los núcleos densos encienden
+   protoestrellas. Protones y neutrones además se ENTREGAN en el colapso. */
 const BUILDINGS = [
   { id:'proton',   name:'PROTÓN',   baseCost:15,     eps:1,    tap:0, mult:0,   color:'#ff2e88',
-    info:'+1 energía/s' },
+    info:'+1/s · masa que calienta' },
   { id:'electron', name:'ELECTRÓN', baseCost:100,    eps:0,    tap:1, mult:0,   color:'#29f3ff',
-    info:'+1 por tap' },
-  { id:'neutrino', name:'NEUTRINO', baseCost:1500,   eps:0,    tap:0, mult:.10, color:'#ffd93b',
-    info:'+10% a TODO' },
+    info:'+1 por tap · radiación' },
+  { id:'neutrino', name:'ONDA DE CHOQUE', baseCost:1500, eps:0, tap:0, mult:.10, color:'#ffd93b',
+    info:'+10% a TODO · comprime la nube' },
   { id:'neutron',  name:'NEUTRÓN',  baseCost:12000,  eps:30,   tap:0, mult:0,   color:'#b14aed',
-    info:'+30 energía/s' },
-  { id:'fusion',   name:'REACTOR',  baseCost:200000, eps:400,  tap:0, mult:0,   color:'#ff7a2e',
-    info:'+400 energía/s' },
+    info:'+30/s · masa pesada' },
+  { id:'fusion',   name:'PROTO ESTRELLA', baseCost:200000, eps:400, tap:0, mult:0, color:'#ff7a2e',
+    info:'+400/s · un núcleo ya arde' },
 ];
 const COST_GROWTH = 1.15;
 const PRESTIGE_UNIT = 1e6;      // energía total por átomo de H (raíz)
@@ -46,9 +51,9 @@ const ACHIEVEMENTS = [
   { id:'proton1',  name:'Materia bariónica',   test:s=>s.counts.proton>=1,  msg:'Primer protón' },
   { id:'proton25', name:'Sopa de quarks',      test:s=>s.counts.proton>=25, msg:'25 protones' },
   { id:'elec10',   name:'Nube electrónica',    test:s=>s.counts.electron>=10, msg:'10 electrones' },
-  { id:'neutrino1',name:'Partícula fantasma',  test:s=>s.counts.neutrino>=1,  msg:'Primer neutrino' },
+  { id:'neutrino1',name:'Eco de supernova',    test:s=>s.counts.neutrino>=1,  msg:'Primera onda de choque' },
   { id:'neutron1', name:'Carga neutral',       test:s=>s.counts.neutron>=1,   msg:'Primer neutrón' },
-  { id:'fusion1',  name:'¡Es una estrella!',   test:s=>s.counts.fusion>=1,    msg:'Primer reactor' },
+  { id:'fusion1',  name:'¡Es una estrella!',   test:s=>s.counts.fusion>=1,    msg:'Primera protoestrella' },
   { id:'e1k',      name:'Kiloelectronvoltio',  test:s=>s.total>=1e3,  msg:'1K de energía total' },
   { id:'e1m',      name:'Megajulio',           test:s=>s.total>=1e6,  msg:'1M de energía total' },
   { id:'e1b',      name:'Supernova',           test:s=>s.total>=1e9,  msg:'1B de energía total' },
