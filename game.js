@@ -28,21 +28,57 @@ const PRESTIGE_UNIT = 1e6;      // energía total por átomo de H (raíz)
 const PARTICLES_PER_H = 25;     // partículas entregadas por H extra en el colapso
 
 /* ---------- tabla de elementos (meta de largo plazo) ---------- */
-/* Se forjan EN ORDEN gastando átomos de HIDRÓGENO (H), ganados con el
-   COLAPSO gravitacional de la nebulosa. Cada uno: +25% a todo, permanente. */
+/* NUCLEOSÍNTESIS REAL: los átomos se ganan (H por colapso, el resto por
+   fusión en la estrella o rayos cósmicos). Descubrir un elemento da +25%
+   a todo, permanente. La escalera alfa sube hasta el Fe. */
 const ELEMENT_BONUS = 1.25;
 const ELEMENTS = [
-  { z:1,  sym:'H',  name:'HIDRÓGENO', cost:1,  color:'#29f3ff' },
-  { z:2,  sym:'He', name:'HELIO',     cost:3,  color:'#ffd93b' },
-  { z:3,  sym:'Li', name:'LITIO',     cost:6,  color:'#ff2e88' },
-  { z:4,  sym:'Be', name:'BERILIO',   cost:10, color:'#7dff6a' },
-  { z:5,  sym:'B',  name:'BORO',      cost:16, color:'#ff7a2e' },
-  { z:6,  sym:'C',  name:'CARBONO',   cost:24, color:'#c9c9dd' },
-  { z:7,  sym:'N',  name:'NITRÓGENO', cost:35, color:'#b14aed' },
-  { z:8,  sym:'O',  name:'OXÍGENO',   cost:50, color:'#ff4f4f' },
-  { z:9,  sym:'F',  name:'FLÚOR',     cost:70, color:'#c8ff4a' },
-  { z:10, sym:'Ne', name:'NEÓN',      cost:95, color:'#ff6fd8' },
+  { z:1,  sym:'H',  name:'HIDRÓGENO', color:'#29f3ff', via:'☀ COLAPSO de la nebulosa' },
+  { z:2,  sym:'He', name:'HELIO',     color:'#ffd93b', via:'fusión 4 H (10 M°)' },
+  { z:3,  sym:'Li', name:'LITIO',     color:'#ff2e88', via:'🌠 rayo cósmico (espalación)' },
+  { z:4,  sym:'Be', name:'BERILIO',   color:'#7dff6a', via:'🌠 rayo cósmico (espalación)' },
+  { z:5,  sym:'B',  name:'BORO',      color:'#ff7a2e', via:'🌠 rayo cósmico (espalación)' },
+  { z:6,  sym:'C',  name:'CARBONO',   color:'#c9c9dd', via:'triple-alfa: 3 He (100 M°)' },
+  { z:7,  sym:'N',  name:'NITRÓGENO', color:'#b14aed', via:'ciclo CNO: C+H (120 M°)' },
+  { z:8,  sym:'O',  name:'OXÍGENO',   color:'#ff4f4f', via:'C+He (200 M°)' },
+  { z:10, sym:'Ne', name:'NEÓN',      color:'#ff6fd8', via:'O+He (350 M°)' },
+  { z:12, sym:'Mg', name:'MAGNESIO',  color:'#9dffb0', via:'Ne+He (600 M°)' },
+  { z:14, sym:'Si', name:'SILICIO',   color:'#ffb86b', via:'Mg+He (1K M°)' },
+  { z:16, sym:'S',  name:'AZUFRE',    color:'#fff06b', via:'Si+He (1.6K M°)' },
+  { z:18, sym:'Ar', name:'ARGÓN',     color:'#8be9fd', via:'S+He (2.6K M°)' },
+  { z:20, sym:'Ca', name:'CALCIO',    color:'#f2f2f2', via:'Ar+He (4.1K M°)' },
+  { z:22, sym:'Ti', name:'TITANIO',   color:'#b0c4de', via:'Ca+He (6.6K M°)' },
+  { z:24, sym:'Cr', name:'CROMO',     color:'#9fe2bf', via:'Ti+He (10.5K M°)' },
+  { z:26, sym:'Fe', name:'HIERRO',    color:'#d08770', via:'Cr+He (17K M°)' },
 ];
+const ELEM = {}; ELEMENTS.forEach(e=>ELEM[e.sym]=e);
+
+/* recetas de fusión: consumen átomos, exigen temperatura, DEVUELVEN energía
+   (la fusión es exotérmica… hasta el hierro, que no paga) */
+const RECIPES = [
+  { out:'He', in:{H:4},       temp:10,    refund:5e4,     note:'cadena protón-protón' },
+  { out:'C',  in:{He:3},      temp:100,   refund:4e5,     note:'triple-alfa ¡se salta Li·Be·B!' },
+  { out:'N',  in:{C:1,H:1},   temp:120,   refund:6e5,     note:'ciclo CNO' },
+  { out:'O',  in:{C:1,He:1},  temp:200,   refund:1.6e6,   note:'escalera alfa' },
+  { out:'Ne', in:{O:1,He:1},  temp:350,   refund:6e6,     note:'escalera alfa' },
+  { out:'Mg', in:{Ne:1,He:1}, temp:600,   refund:2.5e7,   note:'escalera alfa' },
+  { out:'Si', in:{Mg:1,He:1}, temp:1000,  refund:1e8,     note:'escalera alfa' },
+  { out:'S',  in:{Si:1,He:1}, temp:1600,  refund:4e8,     note:'escalera alfa' },
+  { out:'Ar', in:{S:1,He:1},  temp:2600,  refund:1.6e9,   note:'escalera alfa' },
+  { out:'Ca', in:{Ar:1,He:1}, temp:4100,  refund:6.4e9,   note:'escalera alfa' },
+  { out:'Ti', in:{Ca:1,He:1}, temp:6600,  refund:2.56e10, note:'escalera alfa' },
+  { out:'Cr', in:{Ti:1,He:1}, temp:10500, refund:1e11,    note:'escalera alfa' },
+  { out:'Fe', in:{Cr:1,He:1}, temp:17000, refund:0,       note:'el hierro NO paga · así mueren las estrellas' },
+];
+
+/* temperatura: se enfría a la mitad cada 10 h, nunca bajo el piso */
+const COOL_HALFLIFE_S = 36000;
+const HEAT_K = 50;   // costo por grado = HEAT_K × (T+1)²  → acumulado ≈ K·T³/3
+function heatCostPerDegree(T){ return HEAT_K * Math.pow(T+1, 2); }
+/* invierte la integral: cuánta temperatura compra un presupuesto B desde T0 */
+function tempAfterSpend(T0, B){
+  return Math.cbrt(Math.pow(T0+1, 3) + B*3/HEAT_K) - 1;
+}
 
 /* ---------- logros ---------- */
 const ACHIEVEMENTS = [
@@ -60,23 +96,29 @@ const ACHIEVEMENTS = [
   { id:'quark1',   name:'Cazador de quarks',   test:s=>s.quarks>=1,   msg:'Atrapaste un quark dorado' },
   { id:'fever1',   name:'¡FUSIÓN NUCLEAR!',    test:s=>s.fevers>=1,   msg:'Primera fusión' },
   { id:'prestige1',name:'Colapso gravitacional', test:s=>s.hEver>=1, msg:'Tu nebulosa colapsó en Hidrógeno' },
-  { id:'elem1',    name:'¡Elemental!',         test:s=>forgedCount(s)>=1,  msg:'Forjaste tu primer elemento' },
-  { id:'elem5',    name:'Media tabla',         test:s=>forgedCount(s)>=5,  msg:'5 elementos forjados' },
-  { id:'elem10',   name:'Señor del Neón',      test:s=>forgedCount(s)>=10, msg:'¡Los 10 elementos!' },
+  { id:'elem1',    name:'¡Elemental!',         test:s=>forgedCount(s)>=1,  msg:'Primer elemento descubierto' },
+  { id:'fusion2',  name:'Encendido estelar',   test:s=>!!s.seen.fusedOnce, msg:'Primera fusión nuclear' },
+  { id:'elem5',    name:'Media escalera',      test:s=>forgedCount(s)>=5,  msg:'5 elementos descubiertos' },
+  { id:'cosmic1',  name:'Mensajero galáctico', test:s=>!!s.seen.cosmic,    msg:'Espalación por rayo cósmico' },
+  { id:'elem10',   name:'Señor del Neón',      test:s=>forgedCount(s)>=10, msg:'10 elementos descubiertos' },
+  { id:'fe1',      name:'Corazón de hierro',   test:s=>!!(s.elements&&s.elements.Fe), msg:'Fusionaste HIERRO' },
+  { id:'elem17',   name:'Alquimista estelar',  test:s=>forgedCount(s)>=17, msg:'¡Los 17 elementos!' },
 ];
 function forgedCount(s){ return Object.keys((s||S).elements||{}).length; }
 
 /* ---------- estado ---------- */
-const SAVE_KEY = 'atomoLocoSave_v2';
+const SAVE_KEY = 'atomoLocoSave_v3';
 
 function defaultState(){
   const counts = {};
   BUILDINGS.forEach(b=>counts[b.id]=0);
   return {
     e:0, total:0, taps:0,
-    h:0,       // átomos de Hidrógeno en cartera (moneda de forja)
     hEver:0,   // H ganado en la vida (base del mult de colapso)
     hBase:0,   // parte "raíz de energía" ya reclamada (contabilidad del pendiente)
+    atoms:{},  // inventario de átomos por símbolo (H, He, C, …)
+    temp:0,    // temperatura de la estrella en M°
+    tempFloor:0, // piso permanente ("núcleo degenerado")
     quarks:0, fevers:0,
     counts, elements:{}, ach:{}, seen:{}, muted:false, t:Date.now()
   };
@@ -95,6 +137,7 @@ function load(){
     S = Object.assign(defaultState(), d);
     S.counts = Object.assign(defaultState().counts, d.counts||{});
     S.elements = d.elements || {};
+    S.atoms = d.atoms || {};
     return true;
   }catch(e){ return false; }
 }
@@ -118,7 +161,9 @@ function baseEps(){
 }
 function frenzyOn(){ return now() < buffs.frenzyUntil; }
 function feverOn(){ return now() < buffs.feverUntil; }
-function eps(){ return baseEps() * globalMult() * (frenzyOn()?7:1); }
+/* el calor de la estrella también alimenta al motor: +0.5% por M° */
+function tempMult(){ return 1 + 0.005*S.temp; }
+function eps(){ return baseEps() * globalMult() * tempMult() * (frenzyOn()?7:1); }
 function tapValue(){
   let t = 1;
   BUILDINGS.forEach(b=>{ t += b.tap*cnt(b.id); });
@@ -218,15 +263,23 @@ function nucleusBalls(){
   const owned = BUILDINGS.reduce((a,b)=>a+cnt(b.id),0);
   return Math.min(24, 5 + Math.floor(Math.sqrt(owned)));
 }
+/* paleta del núcleo según la evolución estelar (tier 0-3) */
+const STAR_PALETTES = [
+  ['#ff2e88','#ff6fb1','#b14aed'],   // nebulosa rosa
+  ['#ffd93b','#ff9d2e','#ff6fb1'],   // estrella joven (quema H→He)
+  ['#fff6c8','#ffd93b','#ff7a2e'],   // madura (C, O, Ne…)
+  ['#cfe8ff','#ffffff','#8be9fd'],   // gigante azul-blanca (Si→Fe)
+];
 function rebuildBlob(){
   const n = nucleusBalls();
   if(blob.length===n) return;
   blob = [];
+  const pal = STAR_PALETTES[typeof starTier==='function' ? starTier() : 0];
   for(let i=0;i<n;i++){
     const a = Math.random()*Math.PI*2, r = i===0?0:(2+Math.random()*9);
     blob.push({ dx:Math.cos(a)*r, dy:Math.sin(a)*r*0.9,
       r:4.5+Math.random()*2.5,
-      c:i%3===0?'#ff2e88':(i%3===1?'#ff6fb1':'#b14aed') });
+      c:pal[i%pal.length] });
   }
   blob.sort((a,b)=>a.dy-b.dy);
 }
@@ -430,7 +483,7 @@ function refreshHud(){
   $('energy').textContent = '⚡'+fmt(S.e);
   $('eps').textContent = fmt(eps())+' /s' + (frenzyOn()?' 🔥x7':'');
   const pb = $('protium-badge');
-  if(S.h>0 || S.hEver>0){ pb.hidden = false; $('protium-n').textContent = S.h; }
+  if(S.hEver>0){ pb.hidden = false; $('protium-n').textContent = fmt(S.atoms.H||0); }
 }
 
 /* ---------- tienda ---------- */
@@ -564,7 +617,20 @@ quarkEl.addEventListener('pointerdown', ev=>{
   const r = cv.getBoundingClientRect();
   const sx = ev.clientX - r.left, sy = ev.clientY - r.top;
   sndGold(); vibrate([20,30,20]); shake();
-  if(Math.random()<0.5){
+  /* espalación: si tienes C u O y te falta Li/Be/B, el rayo cósmico
+     puede partir un núcleo (así se hace el litio real) */
+  const missing = ['Li','Be','B'].filter(s=>!S.elements[s]);
+  const fuel = atomsOf('C')>0 ? 'C' : (atomsOf('O')>0 ? 'O' : null);
+  const roll = Math.random();
+  if(missing.length && fuel && roll < 0.34){
+    const target = missing[Math.floor(Math.random()*missing.length)];
+    S.atoms[fuel]--;
+    S.atoms[target] = atomsOf(target) + 1;
+    S.seen.cosmic = 1;
+    discover(target);
+    spawnFloater(sx, sy, '¡'+target+'!', 'gold');
+    toast('🌠 ¡ESPALACIÓN! El rayo cósmico partió tu '+fuel+' en '+target);
+  }else if(roll < (missing.length && fuel ? 0.67 : 0.5)){
     const gain = Math.max(eps()*60, tapValue()*40);
     S.e += gain; S.total += gain;
     spawnFloater(sx, sy, '+'+fmt(gain)+'!', 'gold');
@@ -596,8 +662,9 @@ $('prestige-btn').addEventListener('click', ()=>{
 });
 function doColapso(p){
   S.hBase += colapsoBase();   // antes de vaciar contadores
-  S.h += p;
+  S.atoms.H = (S.atoms.H||0) + p;
   S.hEver += p;
+  discover('H');
   S.e = 0;
   BUILDINGS.forEach(b=>S.counts[b.id]=0);
   heat = 0; buffs.feverUntil = 0; buffs.frenzyUntil = 0;
@@ -645,13 +712,93 @@ $('tab-elements').addEventListener('click', ()=>setScreen('elements'));
 /* atajo: tocar el badge H del HUD lleva a la estrella */
 $('protium-badge').addEventListener('click', ()=>setScreen('elements'));
 
-/* ---------- forja de elementos ---------- */
+/* ---------- la estrella: átomos, temperatura y fusión ---------- */
 const elNodes = [];
-function nextForgeIndex(){ return forgedCount(); }   // se forjan en orden
-function lastForgedColor(){
-  const n = forgedCount();
-  return n>0 ? ELEMENTS[n-1].color : null;
+const recipeNodes = [];
+const atomsOf = sym => S.atoms[sym]||0;
+
+function discover(sym){
+  if(S.elements[sym]) return;
+  S.elements[sym] = 1;
+  const el = ELEM[sym];
+  toast('🧪 ¡NUEVO ELEMENTO: '+el.name+'! +25% a todo, permanente');
+  sndAch(); vibrate([20,30,20]);
+  const d = elNodes[ELEMENTS.indexOf(el)];
+  if(d){ d.classList.remove('just-forged'); void d.offsetWidth; d.classList.add('just-forged'); }
+  blob = [];   // el núcleo del motor cambia de paleta
+  save();
 }
+function lastForgedColor(){
+  let c = null;
+  ELEMENTS.forEach(e=>{ if(S.elements[e.sym]) c = e.color; });
+  return c;
+}
+/* tier visual de la estrella según lo fundido: nebulosa → joven → madura → azul */
+function starTier(){
+  if(['Si','S','Ar','Ca','Ti','Cr','Fe'].some(s=>S.elements[s])) return 3;
+  if(['C','N','O','Ne','Mg'].some(s=>S.elements[s])) return 2;
+  if(S.elements.He) return 1;
+  return 0;
+}
+
+/* --- calentamiento (mantener presionado) --- */
+let heating = false;
+const heatBtn = $('heat-btn');
+heatBtn.addEventListener('pointerdown', ev=>{ ev.preventDefault(); heating = true; }, {passive:false});
+['pointerup','pointerleave','pointercancel'].forEach(ev=>
+  heatBtn.addEventListener(ev, ()=>{ heating = false; }));
+let heatBlipAcc = 0;
+function heatTick(dt){
+  if(!heating || screen!=='elements') return;
+  const pour = Math.max(2000, eps()*8) * dt;   // energía vertida este frame
+  const budget = Math.min(pour, S.e);
+  if(budget <= 0) return;
+  S.temp = tempAfterSpend(S.temp, budget);
+  S.e -= budget;
+  heatBlipAcc += dt;
+  if(heatBlipAcc > 0.18){ heatBlipAcc = 0; blip(180 + S.temp%400, .04, 'sawtooth', .05); }
+}
+/* --- enfriamiento: mitad cada 10 h, nunca bajo el piso --- */
+function coolTick(dtSeconds){
+  if(S.temp > S.tempFloor){
+    S.temp = Math.max(S.tempFloor, S.temp * Math.pow(0.5, dtSeconds/COOL_HALFLIFE_S));
+  }
+}
+
+/* --- recetas --- */
+function recipeVisible(r){
+  return Object.keys(r.in).every(k=>S.elements[k]);   // conoces los ingredientes
+}
+function canRun(r){
+  if(S.temp < r.temp) return 'frio';
+  for(const k in r.in) if(atomsOf(k) < r.in[k]) return 'atomos';
+  return 'ok';
+}
+function runRecipe(r, times){
+  let done = 0;
+  for(let i=0;i<times;i++){
+    if(canRun(r)!=='ok') break;
+    for(const k in r.in) S.atoms[k] -= r.in[k];
+    S.atoms[r.out] = atomsOf(r.out) + 1;
+    done++;
+  }
+  if(!done) return;
+  const refund = r.refund * done;
+  if(refund>0){ S.e += refund; S.total += refund; }
+  if(!S.seen['rx_'+r.out]){
+    S.seen['rx_'+r.out] = 1;
+    /* núcleo degenerado: el piso térmico sube para siempre */
+    S.tempFloor = Math.max(S.tempFloor, Math.floor(r.temp*0.75));
+  }
+  S.seen.fusedOnce = 1;
+  discover(r.out);
+  sndBuy(); vibrate(15);
+  const node = recipeNodes.find(n=>n.r===r);
+  if(node){ node.d.classList.remove('bought'); void node.d.offsetWidth; node.d.classList.add('bought'); }
+  refreshStar(); refreshHud(); save();
+}
+
+/* --- construcción de UI --- */
 function buildElements(){
   const grid = $('elements-grid');
   grid.innerHTML = '';
@@ -664,88 +811,107 @@ function buildElements(){
     grid.appendChild(d);
     elNodes[i] = d;
   });
+  const rc = $('recipes');
+  rc.innerHTML = '';
+  recipeNodes.length = 0;
+  RECIPES.forEach(r=>{
+    const d = document.createElement('div');
+    d.className = 'recipe hidden-r';
+    const io = Object.entries(r.in).map(([k,v])=>v+' '+k).join(' + ');
+    d.innerHTML =
+      `<div class="r-body"><div class="r-io">${io} → <b>${r.out}</b></div>`+
+      `<div class="r-meta">🌡 ${fmt(r.temp)} M° · ${r.refund>0?'+⚡'+fmt(r.refund):'sin energía'} · ${r.note}</div></div>`+
+      `<div class="r-btns"></div>`;
+    const btns = d.querySelector('.r-btns');
+    [1,10].forEach(n=>{
+      const b = document.createElement('button');
+      b.textContent = '×'+n;
+      b.addEventListener('pointerdown', ev=>{ ev.preventDefault(); runRecipe(r,n); }, {passive:false});
+      btns.appendChild(b);
+    });
+    rc.appendChild(d);
+    recipeNodes.push({ r, d, btns:[...btns.children] });
+  });
 }
-function refreshElements(){
-  const next = nextForgeIndex();
+
+function elementTapped(i){
+  const el = ELEMENTS[i];
+  const known = !!S.elements[el.sym];
+  showModal((known?el.sym+' · ':'')+ (known?el.name:'¿?'),
+    `Z=${el.z}<br><br>`+
+    (known
+      ? `Tienes: <b>${fmt(atomsOf(el.sym))} átomo${atomsOf(el.sym)===1?'':'s'}</b><br>Origen: <b>${el.via}</b><br><br>+25% activo ✓`
+      : `Sin descubrir.<br>Pista: <b>${el.via}</b>`),
+    [{ label:'OK', cb:()=>{} }]);
+}
+
+/* --- refresco de la pantalla estrella --- */
+function refreshStar(){
+  $('el-wallet').textContent = 'H × '+fmt(atomsOf('H'));
+  $('el-progress').textContent = forgedCount()+'/'+ELEMENTS.length;
+  $('el-mult').textContent = '×'+elementsMult().toFixed(2)+' A TODO';
+
+  /* temperatura */
+  $('temp-val').textContent = '🌡 '+fmt(Math.floor(S.temp))+' M°';
+  const nextR = RECIPES.find(r=>recipeVisible(r) && S.temp < r.temp);
+  $('temp-next').textContent = nextR ? (nextR.out+' a '+fmt(nextR.temp)+' M°') : '¡máximo alcanzado!';
+  const goal = nextR ? nextR.temp : Math.max(S.temp,1);
+  $('temp-fill').style.width = Math.min(100, S.temp/goal*100)+'%';
+  $('temp-floor').textContent = 'piso permanente: '+fmt(Math.floor(S.tempFloor))+' M° · se enfría a la mitad cada 10 h';
+
+  /* recetas */
+  let anyReady = false;
+  recipeNodes.forEach(({r,d,btns})=>{
+    const vis = recipeVisible(r);
+    d.classList.toggle('hidden-r', !vis);
+    if(!vis) return;
+    const st = canRun(r);
+    d.classList.toggle('hot', S.temp >= r.temp);
+    d.classList.toggle('ready', st==='ok');
+    btns.forEach(b=>b.disabled = st!=='ok');
+    if(st==='ok') anyReady = true;
+  });
+
+  /* tiles */
   ELEMENTS.forEach((el,i)=>{
     const d = elNodes[i];
     const cost = d.querySelector('.el-cost');
     d.classList.remove('locked','can','forged');
     if(S.elements[el.sym]){
       d.classList.add('forged');
-      cost.textContent = '✓';
-    }else if(i === next){
-      cost.textContent = el.cost+'H';
-      if(S.h >= el.cost) d.classList.add('can');
+      cost.textContent = '×'+fmt(atomsOf(el.sym));
     }else{
       d.classList.add('locked');
-      cost.textContent = el.cost+'H';
+      cost.textContent = '?';
     }
   });
-  $('el-wallet').textContent = 'H × '+S.h;
-  $('el-progress').textContent = forgedCount()+'/'+ELEMENTS.length+' ELEMENTOS';
-  $('el-mult').textContent = '×'+elementsMult().toFixed(2)+' A TODO';
-  /* punto de aviso en el tab cuando hay forja disponible */
-  const n = ELEMENTS[next];
-  const canForge = !!(n && S.h >= n.cost);
-  $('tab-elements').querySelector('.nav-dot').hidden = !canForge;
-  /* anuncia UNA vez cada elemento que se vuelve alcanzable */
-  if(canForge && !S.seen['can_'+n.sym]){
-    S.seen['can_'+n.sym] = 1;
-    toast('🧪 ¡Ya puedes forjar '+n.name+'!');
-    sndAch();
-  }
-  /* hint dinámico: siempre dice cuál es el siguiente paso hacia el próximo H */
+
+  /* aviso en el tab: fusión lista o H por reclamar */
+  $('tab-elements').querySelector('.nav-dot').hidden = !(anyReady || pendingH()>=1);
+
+  /* hint dinámico: el siguiente paso, siempre */
   const hint = $('elements-hint');
   const pend = pendingH();
-  if(!n){
-    hint.textContent = '🏆 ¡Tabla completa! (por ahora…)';
-  }else if(canForge){
-    hint.textContent = '¡Toca '+n.sym+' para forjarlo!';
-  }else if(pend >= 1){
-    hint.textContent = pend+' H por reclamar → botón ☀ COLAPSO en el motor';
-  }else{
-    /* progreso hacia el siguiente H base: total = (hBase+1)² × 1M */
+  if(!S.elements.H){
     const target = Math.pow(S.hBase+1, 2) * PRESTIGE_UNIT;
     const pct = Math.min(99, Math.floor(S.total/target*100));
-    hint.textContent = 'Próximo H a '+fmt(target)+' de energía total — vas al '+pct+'% (tus protones y neutrones darán H extra)';
+    hint.textContent = pend>=1
+      ? pend+' H por reclamar → botón ☀ COLAPSO en el motor'
+      : 'Consigue H: llega a '+fmt(target)+' de energía total y COLAPSA — vas al '+pct+'%';
+  }else if(anyReady){
+    hint.textContent = '¡FUSIONA! Las recetas verdes están listas';
+  }else if(nextR && S.temp < nextR.temp && Object.keys(nextR.in).every(k=>atomsOf(k)>=nextR.in[k])){
+    hint.textContent = 'Mantén 🔥 CALENTAR hasta '+fmt(nextR.temp)+' M° para fundir '+nextR.out;
+  }else if(atomsOf('H') < 4 && pend >= 1){
+    hint.textContent = pend+' H por reclamar → botón ☀ COLAPSO en el motor';
+  }else if(atomsOf('H') < 4){
+    hint.textContent = 'Junta H colapsando la nebulosa (4 H = 1 He) — tus protones y neutrones dan H extra';
+  }else{
+    hint.textContent = 'Acumula átomos y calor: la escalera alfa sube hasta el HIERRO';
   }
 }
-function elementTapped(i){
-  const el = ELEMENTS[i];
-  const next = nextForgeIndex();
-  if(S.elements[el.sym]){
-    toast(el.sym+' · '+el.name+' — forjado ✓');
-    return;
-  }
-  if(i !== next){
-    toast('🔒 Primero forja '+ELEMENTS[next].sym+' ('+ELEMENTS[next].name+')');
-    return;
-  }
-  if(S.h < el.cost){
-    toast('Necesitas '+el.cost+' H — colapsa la nebulosa en el motor');
-    return;
-  }
-  showModal('🧪 FORJAR '+el.name,
-    `<b>${el.sym}</b> (Z=${el.z})<br><br>Costo: <b>${el.cost} átomo${el.cost>1?'s':''} de H</b><br>`+
-    `Bono: <b>+25% a TODO, para siempre</b><br>(total con este: ×${(elementsMult()*ELEMENT_BONUS).toFixed(2)})`,
-    [
-      { label:'¡FORJAR!', cb:()=>doForge(i) },
-      { label:'Aún no', alt:true, cb:()=>{} },
-    ]);
-}
-function doForge(i){
-  const el = ELEMENTS[i];
-  if(S.h < el.cost || nextForgeIndex() !== i) return;
-  S.h -= el.cost;
-  S.elements[el.sym] = 1;
-  const d = elNodes[i];
-  d.classList.remove('just-forged'); void d.offsetWidth;
-  d.classList.add('just-forged');
-  sndGold(); vibrate([30,50,30]);
-  toast('🧪 ¡'+el.name+' FORJADO! +25% a todo');
-  refreshElements(); refreshHud(); save();
-}
+/* alias para el resto del código */
+const refreshElements = refreshStar;
 const toastQ = [];
 let toastBusy = false;
 function toast(msg){
@@ -826,6 +992,10 @@ function frame(t){
   S.e += eps()*dt;
   S.total += eps()*dt;
 
+  /* la estrella: se enfría siempre, se calienta si mantienes el botón */
+  coolTick(dt);
+  heatTick(dt);
+
   /* decaimiento del combo */
   if(!feverOn() && t - lastTapT > 500){
     heat = Math.max(0, heat - 20*dt);
@@ -864,6 +1034,11 @@ function frame(t){
 /* ---------- arranque ---------- */
 function main(){
   const had = load();
+  if(had){
+    /* enfriamiento offline: la estrella siguió perdiendo calor sin ti */
+    const away = Math.max(0, (Date.now() - S.t)/1000);
+    coolTick(away);
+  }
   buildShop();
   buildElements();
   resize();

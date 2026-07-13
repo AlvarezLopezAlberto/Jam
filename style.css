@@ -346,6 +346,85 @@ html,body{
 #el-progress{color:var(--cyan)}
 #el-mult{color:var(--pink)}
 
+/* panel de la estrella: temperatura */
+#star-panel{
+  background:#1c0b3a;
+  border:3px solid var(--orange);
+  border-radius:10px;
+  padding:10px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+#temp-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:baseline;
+  font-size:9px;
+}
+#temp-val{color:var(--orange);text-shadow:0 0 8px rgba(255,122,46,.6)}
+#temp-next{color:var(--cyan);font-size:7px}
+#temp-gauge{
+  height:12px;
+  background:rgba(0,0,0,.55);
+  border:2px solid rgba(255,255,255,.35);
+  border-radius:3px;
+  overflow:hidden;
+}
+#temp-fill{
+  height:100%;
+  width:0%;
+  background:linear-gradient(90deg,#a3151f,var(--orange),var(--yellow));
+  transition:width .15s linear;
+}
+#temp-floor{font-size:6px;color:rgba(255,246,255,.45)}
+#heat-btn{
+  font-family:var(--px-font);
+  font-size:9px;
+  padding:12px 8px;
+  color:#3a1200;
+  background:linear-gradient(180deg,var(--yellow),var(--orange));
+  border:3px solid #fff;
+  border-radius:8px;
+  box-shadow:0 4px 0 #a3540f;
+  touch-action:none;
+}
+#heat-btn:active,#heat-btn.heating{transform:translateY(3px);box-shadow:0 1px 0 #a3540f}
+#heat-btn:disabled{filter:grayscale(.8) brightness(.55)}
+
+/* recetas de fusión */
+#recipes{display:flex;flex-direction:column;gap:8px}
+.recipe{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  background:#241046;
+  border:3px solid var(--purple);
+  border-radius:8px;
+  padding:8px;
+}
+.recipe.hot{border-color:var(--orange)}
+.recipe.ready{border-color:#7dff6a;box-shadow:0 0 10px rgba(125,255,106,.35)}
+.recipe.hidden-r{display:none}
+.r-body{flex:1;min-width:0}
+.r-io{font-size:8px;line-height:1.5;color:var(--white)}
+.r-io b{color:var(--yellow)}
+.r-meta{font-size:6px;line-height:1.7;color:var(--cyan);opacity:.85}
+.r-btns{display:flex;flex-direction:column;gap:5px}
+.r-btns button{
+  font-family:var(--px-font);
+  font-size:8px;
+  padding:8px 9px;
+  color:#fff;
+  background:var(--pink);
+  border:2px solid #fff;
+  border-radius:6px;
+  box-shadow:0 2px 0 #8a1246;
+}
+.r-btns button:disabled{filter:grayscale(.9) brightness(.5);box-shadow:none}
+.r-btns button:not(:disabled):active{transform:translateY(2px);box-shadow:none}
+.recipe.bought{animation:bought .25s ease-out}
+
 #elements-grid{
   display:grid;
   grid-template-columns:repeat(4,1fr);
