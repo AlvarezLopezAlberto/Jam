@@ -416,11 +416,11 @@ function draw(t){
     pxCircle(bx - b.r*0.35, by - b.r*0.35, b.r*0.3);
   }
 
-  /* carga del colapso: anillo de progreso alrededor del núcleo */
+  /* carga del colapso: anillo SEGMENTADO (1 segmento = 1 H) + resplandor */
   if(motorHold.p > 0){
     ctx.fillStyle = '#ffd93b';
-    pxArc(c.x, c.y, R + 12, motorHold.p, ctx);
-    ctx.globalAlpha = .25 + motorHold.p*.4;
+    pxArcSeg(c.x, c.y, R + 12, motorHold.p, motorHold.n || 1, ctx);
+    ctx.globalAlpha = .2 + motorHold.p*.5;
     ctx.fillStyle = '#ffd93b';
     pxCircle(c.x, c.y, R + 6, ctx);
     ctx.globalAlpha = 1;
@@ -522,6 +522,7 @@ cv.addEventListener('pointerdown', ev=>{
   ev.preventDefault();
   const p = stageToLogical(ev);
   doTap(p);
+  motorHoldReset();
   motorHold.on = true; motorHold.t0 = now();
 }, {passive:false});
 
@@ -776,27 +777,84 @@ function refreshPrestige(){
   txt.textContent = '☀ COLAPSO '+Math.floor(pct)+'% → +'+(1+colapsoBonus())+' H';
 }
 
-/* hold sobre el núcleo: carga el colapso (tap normal sigue dando energía) */
-const motorHold = { on:false, t0:0, p:0 };
-cv.addEventListener('pointerup',     ()=>{ motorHold.on = false; motorHold.p = 0; });
-cv.addEventListener('pointerleave',  ()=>{ motorHold.on = false; motorHold.p = 0; });
-cv.addEventListener('pointercancel', ()=>{ motorHold.on = false; motorHold.p = 0; });
+/* hold sobre el núcleo: carga el colapso SEGMENTADO (tap normal sigue
+   dando energía). El anillo se divide en N segmentos (1 por H pendiente):
+   soltar antes = intercambio PARCIAL proporcional; completar = colapso
+   total clásico. La carga se frena hacia el final para darte tiempo. */
+const motorHold = { on:false, t0:0, p:0, seg:0, n:0, done:false };
+function motorHoldReset(){
+  motorHold.on = false; motorHold.p = 0; motorHold.seg = 0;
+  motorHold.n = 0; motorHold.done = false;
+}
+function motorHoldRelease(){
+  if(motorHold.on && !motorHold.done && motorHold.seg >= 1){
+    doColapsoPartial(motorHold.seg);
+  }
+  motorHoldReset();
+}
+['pointerup','pointerleave','pointercancel'].forEach(ev=>
+  cv.addEventListener(ev, motorHoldRelease));
 function motorHoldTick(t){
-  if(!motorHold.on || pendingH() < 1){ motorHold.p = 0; return; }
+  if(!motorHold.on || motorHold.done) return;
+  const N = pendingH();
+  if(N < 1){ motorHold.p = 0; return; }
   const held = t - motorHold.t0;
-  if(held < 450){ motorHold.p = 0; return; }
-  motorHold.p = Math.min(1, (held - 450)/1800);
-  /* partículas absorbidas hacia el núcleo mientras carga */
+  if(held < 350){ motorHold.p = 0; return; }
+  /* más H pendiente = carga más larga; easing que se frena al final */
+  const dur = Math.min(6000, 1600 + N*120);
+  const x = Math.min(1, (held - 350)/dur);
+  const p = 1 - Math.pow(1 - x, 1.8);
+  motorHold.p = p; motorHold.n = N;
+  /* cruce de segmento: un H más asegurado */
+  const k = Math.min(N, Math.floor(p*N + 1e-9));
+  if(k > motorHold.seg){
+    motorHold.seg = k;
+    const c0 = nucleusCenter();
+    spawnFloater(view.w/2, view.h*0.30, '+1 H', 'big');
+    burst(c0.x, c0.y, '#29f3ff', 6, 1.2);
+    blip(360 + Math.min(k,30)*26, .06, 'square', .1);
+    vibrate(12);
+  }
+  /* absorción: más y más partículas (protones rosas, neutrones morados) */
   const c = nucleusCenter();
-  if(Math.random() < 0.5){
+  const rate = 1 + p*7;
+  for(let i=0;i<rate;i++){
+    if(Math.random() > 0.8) continue;
     const a = Math.random()*Math.PI*2, rr = LW*0.5;
     parts.push({ x:c.x+Math.cos(a)*rr, y:c.y+Math.sin(a)*rr*0.8,
-      vx:-Math.cos(a)*70, vy:-Math.sin(a)*70, life:0.8, sz:2, c:'#ffd93b' });
+      vx:-Math.cos(a)*(80+p*90), vy:-Math.sin(a)*(80+p*90), life:0.7,
+      sz:1.5+p*1.5, c: Math.random()<0.5 ? '#ff2e88' : '#b14aed' });
   }
-  if(motorHold.p >= 1){
-    motorHold.on = false; motorHold.p = 0;
-    doColapso(pendingH());
+  if(x >= 1){
+    motorHold.done = true;
+    doColapso(N);   // circunferencia completa: colapso TOTAL
+    motorHoldReset();
   }
+}
+/* colapso PARCIAL: convierte solo los H asegurados; el resto de la
+   maquinaria (y tu energía) sobrevive */
+function doColapsoPartial(k){
+  const B = Math.max(0, colapsoBase());
+  const N = B + colapsoBonus();
+  k = Math.min(k, N);
+  if(k < 1) return;
+  const bt = Math.min(B, Math.round(k * B / N));   // parte que viene de energía
+  const bo = k - bt;                               // parte que viene de partículas
+  S.hBase += bt;
+  const need = bo * PARTICLES_PER_H;
+  const pr = cnt('proton'), ne = cnt('neutron');
+  const fromP = Math.min(pr, Math.round(need * (pr/((pr+ne)||1))));
+  const fromN = Math.min(ne, need - fromP);
+  S.counts.proton -= fromP;
+  S.counts.neutron -= fromN;
+  S.atoms.H = (S.atoms.H||0) + k;
+  S.hEver += k;
+  discover('H');
+  const c = nucleusCenter();
+  burst(c.x, c.y, '#29f3ff', 24 + Math.min(k,30)*2, 1.8);
+  shake(); sndGold(); vibrate([25,40,25]);
+  toast('☀ Colapso parcial: +'+k+' H — tu maquinaria sigue viva');
+  refreshShop(); refreshHud(); save();
 }
 
 /* ---------- pantallas: motor / estrella / tabla ---------- */
@@ -996,6 +1054,16 @@ function pxArc(x, y, r, frac, g){
   const steps = Math.max(16, Math.round(r*6));
   const n = Math.floor(steps*frac);
   for(let i=0;i<n;i++){
+    const a = -Math.PI/2 + i*(Math.PI*2/steps);
+    g.fillRect((x+Math.cos(a)*r)|0, (y+Math.sin(a)*r)|0, 2, 2);
+  }
+}
+/* arco dividido en nSeg segmentos (con huecos): 1 segmento = 1 H */
+function pxArcSeg(x, y, r, frac, nSeg, g){
+  const steps = Math.max(24, Math.round(r*6));
+  const n = Math.floor(steps*frac);
+  for(let i=0;i<n;i++){
+    if(nSeg > 1 && (i*nSeg) % steps < nSeg) continue;   // hueco entre segmentos
     const a = -Math.PI/2 + i*(Math.PI*2/steps);
     g.fillRect((x+Math.cos(a)*r)|0, (y+Math.sin(a)*r)|0, 2, 2);
   }
@@ -1399,9 +1467,12 @@ function refreshStarScreen(){
   rebuildChips();
   const r = selRecipe;
   /* gauge: el tick es la meta térmica de la receta elegida;
-     ▲ calentando / ▼ enfriándose hacia el piso */
-  const cooling = !heating && S.temp > S.tempFloor + 0.5;
-  $('temp-val').textContent = fmt(Math.floor(S.temp))+'°'+(heating ? ' ▲' : (cooling ? ' ▼' : ''));
+     ▲ vertiendo energía · ♨ el H mantiene el calor · ▼ enfriándose */
+  const hGen = Math.sqrt(atomsOf('H')) * 1.5e-4;
+  const coolRate = S.temp > S.tempFloor ? (S.temp - S.tempFloor)*Math.LN2/COOL_HALFLIFE_S : 0;
+  const net = hGen - coolRate;
+  const arrow = heating ? ' ▲' : (net > 1e-6 ? ' ♨' : (net < -1e-6 ? ' ▼' : ''));
+  $('temp-val').textContent = fmt(Math.floor(S.temp))+'°'+arrow;
   const scale = Math.max(r.temp*1.15, S.temp*1.05, 12);
   $('temp-fill').style.width = Math.min(100, S.temp/scale*100)+'%';
   $('temp-floor-fill').style.width = Math.min(100, S.tempFloor/scale*100)+'%';
@@ -1655,7 +1726,10 @@ function frame(t){
   S.e += eps()*dt;
   S.total += eps()*dt;
 
-  /* la estrella: se enfría siempre, se calienta si mantienes el botón */
+  /* la estrella: el HIDRÓGENO es combustible — genera calor pasivo (√H),
+     el enfriamiento tira hacia el piso, y el tap/hold vierte energía */
+  const hGen = Math.sqrt(atomsOf('H')) * 1.5e-4;
+  if(hGen > 0) S.temp += hGen * dt;
   coolTick(dt);
   heatTick(dt);
 

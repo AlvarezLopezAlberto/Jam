@@ -58,7 +58,11 @@ Bono por descubrimiento: +25% los primeros 17, +10% del 18 en adelante (multipli
 ## El lenguaje táctil (igual en todas las pantallas)
 
 **TAP = acción · MANTENER = evento cósmico.**
-- Motor: tap al átomo = energía · **mantener el átomo** (cuando el badge ☀ avisa) = COLAPSO, con anillo de carga y partículas absorbidas.
+- Motor: tap al átomo = energía · **mantener el átomo** = COLAPSO **segmentado**: el anillo se divide en N segmentos (1 por H pendiente). Soltar antes = **colapso parcial** (solo intercambias los H asegurados: se consumen sus 25 partículas c/u y tu energía/maquinaria sobrevive). Completar la circunferencia = colapso total clásico (todo se convierte). La carga se frena hacia el final (easing) para darte tiempo de decidir, y las partículas absorbidas (protones rosas, neutrones morados) crecen en intensidad — cada segmento cruzado suena, vibra y suelta un "+1 H".
+
+## Calor pasivo: el hidrógeno es combustible
+
+Cada átomo de H genera calor pasivo (escala **√H × 1.5e-4 M°/s** — equilibrio ≈ √H × 7.8 M° sobre el piso, se acumula en horas: es el mecanismo idle). Solo el H lo hace, como en las estrellas de secuencia principal — y crea el tradeoff central: fusionar 4H→He te da elementos pero **consume tus calentadores**. El gauge lo indica: `▲` vertiendo energía · `♨` el H sostiene el calor · `▼` enfriándose.
 - Estrella: tap a la estrella = inyectar calor · **mantener la estrella** (cuando el badge 💥 está listo) = SUPERNOVA.
 - La fusión vive en un **bottom sheet** arrastrable: asomado muestra el botón FUSIONAR; ampliado, el reactor pictográfico y los chips de recetas.
 
