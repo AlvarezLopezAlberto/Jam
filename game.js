@@ -835,7 +835,7 @@ function motorHoldTick(t){
     }
     if(!S.seen.partialHint){
       S.seen.partialHint = 1;
-      toast('☀ Suelta cuando quieras: te llevas los H asegurados y tu maquinaria SIGUE VIVA');
+      toast('☀ Suelta cuando quieras: te llevas los H asegurados pagando solo esa fracción de tu átomo');
       setTimeout(()=>toast('☀ Anillo completo = COLAPSO TOTAL: reinicia todo por el premio entero'), 2500);
     }
   }
@@ -855,29 +855,26 @@ function motorHoldTick(t){
     motorHoldReset();
   }
 }
-/* colapso PARCIAL: convierte solo los H asegurados; el resto de la
-   maquinaria (y tu energía) sobrevive */
+/* colapso PARCIAL: convierte solo los H asegurados y pagas la fracción
+   k/N de tu energía y de cada edificio — el colapso total es el caso k=N */
 function doColapsoPartial(k){
   const B = Math.max(0, colapsoBase());
   const N = B + colapsoBonus();
   k = Math.min(k, N);
   if(k < 1) return;
+  const frac = k / N;
   const bt = Math.min(B, Math.round(k * B / N));   // parte que viene de energía
-  const bo = k - bt;                               // parte que viene de partículas
   S.hBase += bt;
-  const need = bo * PARTICLES_PER_H;
-  const pr = cnt('proton'), ne = cnt('neutron');
-  const fromP = Math.min(pr, Math.round(need * (pr/((pr+ne)||1))));
-  const fromN = Math.min(ne, need - fromP);
-  S.counts.proton -= fromP;
-  S.counts.neutron -= fromN;
+  /* pago proporcional (floor: la fracción que conservas se redondea a tu favor) */
+  S.e = Math.floor(S.e * (1 - frac));
+  BUILDINGS.forEach(b=>{ S.counts[b.id] -= Math.floor(cnt(b.id) * frac); });
   S.atoms.H = (S.atoms.H||0) + k;
   S.hEver += k;
   discover('H');
   const c = nucleusCenter();
   burst(c.x, c.y, '#29f3ff', 24 + Math.min(k,30)*2, 1.8);
   shake(); sndGold(); vibrate([25,40,25]);
-  toast('☀ Colapso parcial: +'+k+' H — tu maquinaria sigue viva');
+  toast('☀ Colapso parcial: +'+k+' H — entregaste el '+Math.round(frac*100)+'% de tu átomo');
   refreshShop(); refreshHud(); save();
 }
 
