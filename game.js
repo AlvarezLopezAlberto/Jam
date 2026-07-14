@@ -173,7 +173,7 @@ function defaultState(){
     tempFloor:0, // piso permanente ("núcleo degenerado")
     dust:0,    // ✦ polvo estelar (supernovas): +75% a todo c/u
     novas:0,   // supernovas hechas: cada una exige más Fe que la anterior
-    quarks:0, fevers:0,
+    quarks:0, fevers:0, surges:0,
     counts, elements:{}, ach:{}, seen:{}, muted:false, t:Date.now()
   };
 }
@@ -225,6 +225,7 @@ function baseEps(){
 }
 function frenzyOn(){ return now() < buffs.frenzyUntil; }
 function feverOn(){ return now() < buffs.feverUntil; }
+function surgeOn(){ return now() < buffs.surgeUntil; }
 /* el calor de la estrella también alimenta al motor: +0.5% por M° */
 function tempMult(){ return 1 + 0.005*S.temp; }
 function eps(){ return baseEps() * globalMult() * tempMult() * (frenzyOn()?7:1); }
@@ -488,7 +489,7 @@ function dashEllipse(x,y,rx,ry,rot,g=ctx){
 }
 
 /* ---------- combo / fiebre ---------- */
-const buffs = { feverUntil:0, frenzyUntil:0 };
+const buffs = { feverUntil:0, frenzyUntil:0, surgeUntil:0 };
 let heat = 0, lastTapT = 0;
 const FEVER_MS = 8000;
 
@@ -717,10 +718,12 @@ quarkEl.addEventListener('pointerdown', ev=>{
   }else if(roll < (missing.length && fuel ? 0.67 : 0.5)){
     const gain = Math.max(eps()*60, tapValue()*40);
     S.e += gain; S.total += gain;
-    spawnFloater(sx, sy, '+'+fmt(gain)+'!', 'gold');
+    spawnFloater(sx, sy, '+'+fmt(gain)+' ⚡', 'gold');
+    toast('🌟 ¡Quark de ENERGÍA! +'+fmt(gain)+' ⚡ al instante');
   }else{
     buffs.frenzyUntil = now() + 20000;
     spawnFloater(sx, sy, '¡FRENESÍ x7!', 'gold');
+    toast('🔥 ¡FRENESÍ! Todo ×7 durante 20s');
   }
   burst(sx/view.scale, sy/view.scale, '#ffd93b', 30, 2);
   hideQuark();
@@ -753,6 +756,13 @@ function refreshPrestige(){
   const badge = $('colapso-badge');
   const txt = $('colapso-txt');
   const fill = $('colapso-fill');
+  /* durante el hold: contador de H asegurados (el anillo capea a 24 muescas) */
+  if(motorHold.on && motorHold.seg > 0){
+    badge.hidden = false;
+    badge.classList.add('ready');
+    txt.textContent = '☀ '+motorHold.seg+'/'+motorHold.n+' H asegurados';
+    return;
+  }
   if(p >= 1){
     /* listo: dorado pulsante, el hold es la acción */
     badge.hidden = false;
@@ -771,6 +781,11 @@ function refreshPrestige(){
   if(S.total < 10000 && S.hEver === 0){ badge.hidden = true; return; }
   badge.hidden = false;
   badge.classList.remove('ready');
+  if(!S.seen.colapsoHint){
+    S.seen.colapsoHint = 1;
+    toast('☀ COLAPSO: tu ENERGÍA TOTAL histórica llena la barra — taps y generadores, todo suma');
+    setTimeout(()=>toast('☀ Bono: cada 25 protones+neutrones = +1 H extra al colapsar'), 2500);
+  }
   const pct = Math.min(99.9, S.total/target*100);
   fill.style.width = pct.toFixed(1)+'%';
   /* el premio previsualizado crece si compras protones/neutrones */
@@ -781,10 +796,10 @@ function refreshPrestige(){
    dando energía). El anillo se divide en N segmentos (1 por H pendiente):
    soltar antes = intercambio PARCIAL proporcional; completar = colapso
    total clásico. La carga se frena hacia el final para darte tiempo. */
-const motorHold = { on:false, t0:0, p:0, seg:0, n:0, done:false };
+const motorHold = { on:false, t0:0, p:0, seg:0, n:0, done:false, lastFx:0 };
 function motorHoldReset(){
   motorHold.on = false; motorHold.p = 0; motorHold.seg = 0;
-  motorHold.n = 0; motorHold.done = false;
+  motorHold.n = 0; motorHold.done = false; motorHold.lastFx = 0;
 }
 function motorHoldRelease(){
   if(motorHold.on && !motorHold.done && motorHold.seg >= 1){
@@ -805,15 +820,24 @@ function motorHoldTick(t){
   const x = Math.min(1, (held - 350)/dur);
   const p = 1 - Math.pow(1 - x, 1.8);
   motorHold.p = p; motorHold.n = N;
-  /* cruce de segmento: un H más asegurado */
+  /* cruce de segmento: un H más asegurado (feedback agrupado — con
+     cientos de H un floater por segmento sería spam) */
   const k = Math.min(N, Math.floor(p*N + 1e-9));
   if(k > motorHold.seg){
     motorHold.seg = k;
     const c0 = nucleusCenter();
-    spawnFloater(view.w/2, view.h*0.30, '+1 H', 'big');
     burst(c0.x, c0.y, '#29f3ff', 6, 1.2);
-    blip(360 + Math.min(k,30)*26, .06, 'square', .1);
-    vibrate(12);
+    if(t - motorHold.lastFx > 250){
+      motorHold.lastFx = t;
+      spawnFloater(view.w/2, view.h*0.30, '+'+k+' H', 'big');
+      blip(360 + Math.min(k,30)*26, .06, 'square', .1);
+      vibrate(12);
+    }
+    if(!S.seen.partialHint){
+      S.seen.partialHint = 1;
+      toast('☀ Suelta cuando quieras: te llevas los H asegurados y tu maquinaria SIGUE VIVA');
+      setTimeout(()=>toast('☀ Anillo completo = COLAPSO TOTAL: reinicia todo por el premio entero'), 2500);
+    }
   }
   /* absorción: más y más partículas (protones rosas, neutrones morados) */
   const c = nucleusCenter();
@@ -877,6 +901,17 @@ $('tab-star').addEventListener('click', ()=>setScreen('star'));
 $('tab-tabla').addEventListener('click', ()=>setScreen('tabla'));
 /* atajo: tocar el badge H del HUD lleva a la estrella */
 $('protium-badge').addEventListener('click', ()=>setScreen('star'));
+/* tocar el medidor de colapso explica de dónde sale el H */
+$('colapso-badge').addEventListener('click', ()=>{
+  const target = Math.pow(S.hBase+1, 2) * PRESTIGE_UNIT;
+  const parts = cnt('proton') + cnt('neutron');
+  showModal('☀ COLAPSO',
+    'Tu <b>energía TOTAL histórica</b> llena la barra — taps y generadores, todo suma.<br><br>'
+    + '⚡ '+fmt(S.total)+' / '+fmt(target)+'<br><br>'
+    + 'Bono: '+parts+'/'+PARTICLES_PER_H+' partículas → <b>+'+colapsoBonus()+' H</b> extra.<br><br>'
+    + 'Comprar protones y neutrones NO se pierde: se convierten en tu H.',
+    [{ label:'¡ENTENDIDO!', cb:()=>{} }]);
+});
 
 /* ---------- la estrella: átomos, temperatura y fusión ---------- */
 const elNodes = [];
@@ -911,11 +946,30 @@ function starTier(){
    mismo lenguaje que el motor: tap = acción, hold = evento cósmico */
 let heating = false;
 const starHold = { on:false, t0:0, p:0 };
+/* SOBRECARGA: picar seguido a la estrella carga el medidor; al 100 la misma
+   energía compra ×5 temperatura por unos segundos (la fiebre de la estrella) */
+const SURGE_MS = 6000;
+let starHeat = 0, lastStarPourT = 0;
+function surgeCharge(){
+  if(surgeOn()) return;
+  starHeat = Math.min(100, starHeat + 8);
+  lastStarPourT = now();
+  if(starHeat >= 100){
+    buffs.surgeUntil = now() + SURGE_MS;
+    S.surges++;
+    starHeat = 0;
+    $('star-stage').classList.add('surge');
+    $('surge-label').hidden = false;
+    sndFever(); shake(); vibrate([30,40,30]);
+  }
+}
 function pourChunk(){
-  const budget = Math.min(S.e, Math.max(1500, eps()*1.2));
+  /* el vertido también escala con tu banco: ahorrar y soltar en ráfaga rinde */
+  const budget = Math.min(S.e, Math.max(1500, eps()*1.2, S.e*0.04));
   if(budget <= 0) return;
-  S.temp = tempAfterSpend(S.temp, budget);
+  S.temp = tempAfterSpend(S.temp, budget * (surgeOn()?5:1));
   S.e -= budget;
+  surgeCharge();
   blip(200 + Math.min(S.temp,800), .05, 'sawtooth', .07);
   vibrate(8);
 }
@@ -923,10 +977,10 @@ let heatBlipAcc = 0;
 function heatTick(dt){
   if(!heating || screen!=='star') return;
   if(starHold.p > 0) return;                    // cargando supernova: no vierte
-  const pour = Math.max(2000, eps()*8) * dt;    // chorro continuo al mantener
+  const pour = Math.max(2000, eps()*8, S.e*0.35) * dt;   // chorro continuo al mantener
   const budget = Math.min(pour, S.e);
   if(budget <= 0) return;
-  S.temp = tempAfterSpend(S.temp, budget);
+  S.temp = tempAfterSpend(S.temp, budget * (surgeOn()?5:1));
   S.e -= budget;
   heatBlipAcc += dt;
   if(heatBlipAcc > 0.18){ heatBlipAcc = 0; blip(180 + S.temp%400, .04, 'sawtooth', .05); }
@@ -1061,12 +1115,15 @@ function pxArc(x, y, r, frac, g){
     g.fillRect((x+Math.cos(a)*r)|0, (y+Math.sin(a)*r)|0, 2, 2);
   }
 }
-/* arco dividido en nSeg segmentos (con huecos): 1 segmento = 1 H */
+/* arco dividido en nSeg segmentos (con huecos): 1 segmento = 1 H.
+   Con muchos H se capea a 24 muescas — más huecos que píxeles borraría el anillo */
 function pxArcSeg(x, y, r, frac, nSeg, g){
   const steps = Math.max(24, Math.round(r*6));
+  const segVis = Math.max(1, Math.min(nSeg, 24));
+  const per = steps / segVis;
   const n = Math.floor(steps*frac);
   for(let i=0;i<n;i++){
-    if(nSeg > 1 && (i*nSeg) % steps < nSeg) continue;   // hueco entre segmentos
+    if(segVis > 1 && (i % per) < 1) continue;   // hueco entre segmentos
     const a = -Math.PI/2 + i*(Math.PI*2/steps);
     g.fillRect((x+Math.cos(a)*r)|0, (y+Math.sin(a)*r)|0, 2, 2);
   }
@@ -1215,7 +1272,8 @@ function drawStar(t){
 
   /* chorro de energía al calentar (naranja, rápido, desde abajo) */
   if(heating && screen==='star' && S.e > 0){
-    for(let i=0;i<2;i++) heatStream.push({ x:Math.random()*LW2, y:LH2+2, spd:0.09 });
+    const jets = surgeOn() ? 6 : 2;
+    for(let i=0;i<jets;i++) heatStream.push({ x:Math.random()*LW2, y:LH2+2, spd:0.09 });
   }
   /* combustible pasivo: átomos de H (cian) cayendo lento desde alrededor */
   if(!novaFX && atomsOf('H') > 0 && Math.random() < Math.min(0.45, Math.sqrt(atomsOf('H'))*0.03)){
@@ -1329,7 +1387,7 @@ function rebuildChips(){
   vis.forEach(r=>{
     const d = document.createElement('button');
     d.className = 'chip';
-    d.appendChild(ballEl(r.out, 20, true));
+    d.appendChild(ballEl(r.out, 28, true));
     const tEl = document.createElement('span');
     tEl.className = 'chip-t'; tEl.textContent = fmt(r.temp)+'°';
     d.appendChild(tEl);
@@ -1366,7 +1424,7 @@ function buildReactor(){
     }
     const g = document.createElement('div'); g.className = 'slot-group';
     const balls = document.createElement('div'); balls.className = 'slot-balls';
-    for(let i=0;i<qty;i++) balls.appendChild(ballEl(sym, 14));
+    for(let i=0;i<qty;i++) balls.appendChild(ballEl(sym, 20));
     const cntEl = document.createElement('div'); cntEl.className = 'slot-count';
     g.append(balls, cntEl); box.appendChild(g);
     reactorRefs.push({ sym, qty, cntEl, gEl:g });
@@ -1376,7 +1434,7 @@ function buildReactor(){
   box.appendChild(arrow);
   const pg = document.createElement('div'); pg.className = 'slot-group';
   const pb = document.createElement('div'); pb.className = 'slot-balls';
-  pb.appendChild(ballEl(r.out, 22, true));
+  pb.appendChild(ballEl(r.out, 30, true));
   const pc = document.createElement('div'); pc.className = 'slot-count';
   pg.append(pb, pc); box.appendChild(pg);
   reactorRefs.push({ sym:r.out, qty:0, cntEl:pc, gEl:pg, product:true });
@@ -1494,6 +1552,14 @@ function refreshStarScreen(){
       + (perHour >= 10 ? Math.round(perHour) : perHour.toFixed(1)) + '°/h';
   }else{
     chip.hidden = true;
+  }
+  /* chip: el calor retroalimenta al motor (tempMult = +0.5% eps por M°) */
+  const tc = $('tempmult-chip');
+  tc.hidden = S.temp < 1;
+  if(!tc.hidden) tc.textContent = '🔥→⚡ +'+Math.round(S.temp*0.5)+'% al motor';
+  if(S.temp >= 10 && !S.seen.tempMultHint){
+    S.seen.tempMultHint = 1;
+    toast('🔥 Estrella caliente = motor feliz: +0.5% ⚡/s por cada M°');
   }
   const scale = Math.max(r.temp*1.15, S.temp*1.05, 12);
   $('temp-fill').style.width = Math.min(100, S.temp/scale*100)+'%';
@@ -1775,6 +1841,14 @@ function frame(t){
   if(!feverOn() && stage.classList.contains('fever')){
     stage.classList.remove('fever');
     $('fever-label').hidden = true;
+  }
+  /* decaimiento de la sobrecarga estelar */
+  if(!surgeOn() && t - lastStarPourT > 600) starHeat = Math.max(0, starHeat - 25*dt);
+  if(screen === 'star') $('surge-bar').style.width = (surgeOn()? 100 : starHeat) + '%';
+  const ss = $('star-stage');
+  if(!surgeOn() && ss.classList.contains('surge')){
+    ss.classList.remove('surge');
+    $('surge-label').hidden = true;
   }
   /* etiqueta de frenesí */
   const bl = $('buff-label');
