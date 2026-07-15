@@ -181,6 +181,10 @@ let S = defaultState();
 
 function save(){
   S.t = Date.now();
+  /* guard: nunca persistir NaN/Infinity (JSON los vuelve null y corrompe) */
+  ['e','total','temp','tempFloor','hEver','hBase','dust'].forEach(k=>{
+    if(!isFinite(S[k])) S[k] = 0;
+  });
   try{ localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }catch(e){}
 }
 function load(){
@@ -226,8 +230,10 @@ function baseEps(){
 function frenzyOn(){ return now() < buffs.frenzyUntil; }
 function feverOn(){ return now() < buffs.feverUntil; }
 function surgeOn(){ return now() < buffs.surgeUntil; }
-/* el calor de la estrella también alimenta al motor: +0.5% por M° */
-function tempMult(){ return 1 + 0.005*S.temp; }
+/* el calor de la estrella también alimenta al motor: +0.5% por M°.
+   Tope en el umbral del Fe (17000 M° → ×86): más allá del hierro el calor
+   ya no rinde — sin tope, verter bancos enormes hace eps ∝ ∛banco y diverge */
+function tempMult(){ return 1 + 0.005*Math.min(S.temp, 17000); }
 function eps(){ return baseEps() * globalMult() * tempMult() * (frenzyOn()?7:1); }
 function tapValue(){
   let t = 1;
@@ -237,8 +243,12 @@ function tapValue(){
 /* COLAPSO: la parte base sale de la energía total (raíz), y ENTREGAR tus
    partículas (protones+neutrones) suma H extra — se convierten literalmente
    en el hidrógeno que te llevas. Solo disponible cuando la base ≥ 1. */
+/* raíz 4ª: con sqrt, el ingreso de H quedaba proporcional a TODOS los
+   multiplicadores (elem×dust×calor inyectan al total → sqrt → H) y el juego
+   óptimo ganaba millones de H/hora. Con ^0.25 el H desacelera (~t^⅓)
+   y el primer H sigue costando exactamente PRESTIGE_UNIT */
 function colapsoBase(){
-  return Math.floor(Math.sqrt(S.total / PRESTIGE_UNIT)) - S.hBase;
+  return Math.floor(Math.pow(S.total / PRESTIGE_UNIT, 0.25)) - S.hBase;
 }
 function colapsoBonus(){
   return Math.floor((cnt('proton') + cnt('neutron')) / PARTICLES_PER_H);
@@ -777,7 +787,7 @@ function refreshPrestige(){
   }
   /* aún no: medidor de progreso hacia el próximo H, siempre visible
      desde temprano — la meta nunca es un misterio */
-  const target = Math.pow(S.hBase+1, 2) * PRESTIGE_UNIT;
+  const target = Math.pow(S.hBase+1, 4) * PRESTIGE_UNIT;
   if(S.total < 10000 && S.hEver === 0){ badge.hidden = true; return; }
   badge.hidden = false;
   badge.classList.remove('ready');
@@ -863,7 +873,9 @@ function doColapsoPartial(k){
   k = Math.min(k, N);
   if(k < 1) return;
   const frac = k / N;
-  const bt = Math.min(B, Math.round(k * B / N));   // parte que viene de energía
+  /* siempre paga al menos 1 de base: sin el max(1), cosechar k<N/2 con
+     round→0 dejaba hBase congelado = H infinitos sin subir el umbral */
+  const bt = Math.min(B, Math.max(1, Math.round(k * B / N)));
   S.hBase += bt;
   /* pago proporcional (floor: la fracción que conservas se redondea a tu favor) */
   S.e = Math.floor(S.e * (1 - frac));
@@ -900,7 +912,7 @@ $('tab-tabla').addEventListener('click', ()=>setScreen('tabla'));
 $('protium-badge').addEventListener('click', ()=>setScreen('star'));
 /* tocar el medidor de colapso explica de dónde sale el H */
 $('colapso-badge').addEventListener('click', ()=>{
-  const target = Math.pow(S.hBase+1, 2) * PRESTIGE_UNIT;
+  const target = Math.pow(S.hBase+1, 4) * PRESTIGE_UNIT;
   const parts = cnt('proton') + cnt('neutron');
   showModal('☀ COLAPSO',
     'Tu <b>energía TOTAL histórica</b> llena la barra — taps y generadores, todo suma.<br><br>'
@@ -982,12 +994,19 @@ function heatTick(dt){
   heatBlipAcc += dt;
   if(heatBlipAcc > 0.18){ heatBlipAcc = 0; blip(180 + S.temp%400, .04, 'sawtooth', .05); }
 }
-/* supernova: exige núcleo de Fe DE ESTA GENERACIÓN, y cada una pide más */
-function novaFeNeeded(){ return Math.pow(S.novas + 1, 2); }   // 1, 4, 9, 16…
+/* supernova: exige núcleo de Fe DE ESTA GENERACIÓN, y cada una pide más.
+   Exponencial (1, 2, 4, 8…): el H crece ~lineal en el tiempo, así que un
+   requisito cuadrático se volvía trivial y las novas se encadenaban en horas.
+   Base 2 (no 3): el pool pide ~10 novas; con 3^n la décima costaría 19K Fe
+   ≈ 1M de H (meses) — con 2^n el arco completo son ~2-3 semanas */
+function novaFeNeeded(){ return Math.pow(2, S.novas); }   // 1, 2, 4, 8…
 function novaReady(){ return atomsOf('Fe') >= novaFeNeeded(); }
 function novaGain(){
   const atomsTotal = Object.values(S.atoms).reduce((a,b)=>a+(b||0),0);
-  return 1 + Math.floor(atomsTotal/200);
+  /* escala raíz + tope por generación: acumular átomos premia, pero el
+     polvo total tras N novas queda ~N² (sin esto, dust ∝ átomos ∝ √total
+     y el juego diverge a Infinity en horas de juego óptimo) */
+  return Math.min(1 + Math.floor(Math.sqrt(atomsTotal/200)), 2*(S.novas+1));
 }
 
 const starTouchEl = $('starcv');
@@ -1038,7 +1057,10 @@ function runRecipe(r, times){
   }
   if(!done) return;
   const refund = r.refund * done;
-  if(refund>0){ S.e += refund; S.total += refund; }
+  /* el refund es energía UTILIZABLE pero no cuenta al colapso (S.total):
+     si contara, fusionar Cr "cría" H base gratis hasta hBase≈2000
+     (refund/H quemado > costo marginal del H) y el prestigio se rompe */
+  if(refund>0){ S.e += refund; }
   if(!S.seen['rx_'+r.out]){
     S.seen['rx_'+r.out] = 1;
     /* núcleo degenerado: el piso térmico sube para siempre */
@@ -1643,7 +1665,7 @@ function refreshTabla(){
   const hint = $('elements-hint');
   const pend = pendingH();
   if(!S.elements.H){
-    const target = Math.pow(S.hBase+1, 2) * PRESTIGE_UNIT;
+    const target = Math.pow(S.hBase+1, 4) * PRESTIGE_UNIT;
     const pct = Math.min(99, Math.floor(S.total/target*100));
     hint.textContent = pend>=1
       ? pend+' H listos → MANTÉN presionado el átomo del motor'
@@ -1667,7 +1689,9 @@ function refreshElements(){
 /* ---------- SUPERNOVA (Acto 3) ---------- */
 function novaDropCount(gain){
   const missing = NOVA_POOL.filter(e=>!S.elements[e.sym]).length;
-  return Math.min(missing, 2 + gain);   // más átomos al explotar = más botín
+  /* + S.novas: cada explosión siembra un medio ya enriquecido — sin esto,
+     completar el pool de 66 pedía ~18 novas (Fe 2^17) = meses */
+  return Math.min(missing, 2 + gain + S.novas);
 }
 /* la explosión se dispara MANTENIENDO presionada la estrella (sin modal:
    la carga de 2.8s con FX es la confirmación) */
@@ -1718,7 +1742,9 @@ function labUnlocked(){ return ELEMENTS.filter(e=>e.z<=92).every(e=>S.elements[e
 function nextLab(){ return LAB_ELEMENTS.find(e=>!S.elements[e.sym]); }
 function labCost(){
   const done = LAB_ELEMENTS.filter(e=>S.elements[e.sym]).length;
-  return 1e13 * Math.pow(5, done);
+  /* ×2 por síntesis (no ×5): con ×5 el Og costaba 3e30 ⚡ — inalcanzable
+     para siempre con la curva post-balance (el banco tardío ronda 1e19-1e21) */
+  return 1e13 * Math.pow(2, done);
 }
 $('lab-btn').addEventListener('click', ()=>{
   const el = nextLab();
@@ -1916,9 +1942,14 @@ function frame(t){
 function main(){
   const had = load();
   if(had){
-    /* enfriamiento offline: la estrella siguió perdiendo calor sin ti */
+    /* offline: enfriamiento Y calor pasivo del H (el mecanismo idle que
+       promete el README). Forma cerrada de T' = g − λ(T−piso):
+       T(t) = Teq + (T0−Teq)·e^{−λt}, Teq = piso + g/λ */
     const away = Math.max(0, (Date.now() - S.t)/1000);
-    coolTick(away);
+    const lam = Math.LN2 / COOL_HALFLIFE_S;
+    const g = hGenRate();
+    const teq = S.tempFloor + g/lam;
+    S.temp = Math.max(S.tempFloor, teq + (S.temp - teq)*Math.exp(-lam*away));
   }
   buildShop();
   buildElements();
